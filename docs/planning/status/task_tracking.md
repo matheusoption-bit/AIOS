@@ -1,0 +1,44 @@
+# Backlog Canônico de Execução da Fase 0 - Plano de Trabalho
+
+- [x] Pesquisar e ler os documentos obrigatórios [/]
+  - [x] Ler `SUCCESSOR_SYSTEM_PROVISIONAL_LAW.md`
+  - [x] Ler `PLANO_CANONICO_EXECUCAO_FASE_0_FINAL.md`
+  - [x] Localizar e ler `SUCCESSOR_SYSTEM_DECISION_DOCKET.md` [/]
+  - [x] Localizar e ler `FOUNDING_RECOMMENDATION_RED_TEAM_V3_BLIND.md` [/]
+- [x] Elaborar o Plano de Implementação (interno)
+- [x] Construir o Backlog Canônico em Português
+- [x] Refinar o Backlog com Ajustes Obrigatórios
+- [x] Reconciliar Backlog Detalhado e Ordenado
+- [x] Aplicar Ajustes Finais do Fundador
+- [x] Executar Bloco 1: Eliminação de Incerteza Crítica
+- [x] Executar Bloco 2: Fundação de Contratos e Regras
+  - [x] F0-B2-T4: Formalização dos Tipos Core (Intent/LedgerEntry/Result)
+  - [x] F0-B2-T5: Formalização de Budgets e Termination Policy
+  - [x] F0-B2-T6: Consolidação do Modelo de Ameaça Dia 1
+  - [x] Registro de Pendências de Arrasto (A1, A2, A3, A4)
+  - [x] Refinar Contratos de B2 (União Discriminada, Status Mapping, Budget Object)
+  - [x] Ajustes Finais de B2 (Intent Kind, Metadata Schema, Ledger Payload)
+- [x] Executar Bloco 3: Engenharia de Fluxo (FSM)
+- [x] Executar Bloco 4: I/O de Contenção e Auditoria [/]
+  - [x] Lote 4A: Especificação Canônica
+    - [x] F0-B4-T9: Especificação de Rollback do Repositorio
+    - [x] F0-B4-T10: Especificação da SandboxInterface
+    - [x] F0-B4-T12: Formalização do Event Log Mínimo (Ledger)
+    - [x] Refinar SandboxInterface (Resultados Estruturados e I/O)
+  - [x] Lote 4B: Experimento de Sandbox (Portabilidade Provada)
+  - [!] Nota: Adaptador Subprocess validou abstração, NÃO isolamento operacional final.
+- [x] Executar Bloco 5: Gate de Benchmark Mock-First
+  - [x] F0-B5-T13: Especificação do Protocolo de Benchmark
+  - [x] Refinar Protocolo (Ledger Taxonomy, Rollback Hardening, S5 Security)
+  - [x] F0-B5-T14: Execução do Mock-Run (5 Cenários Críticos)
+  - [x] F0-B5-T15: Consolidação do Veredito da Fase 0
+- [x] Revisão e Entrega do Veredito Final de Fase 0
+- [x] Lote 1 da Fase 1: Isolamento de Sandbox (Encerrado Arquiteturalmente)
+  - [x] Etapa 1: Threat Model e Especificação
+  - [x] Lote 1B — Validação Empírica da Boundary (Homologação 100%)
+- [x] Auditoria e Reorganização Profissional de Artefatos
+  - [x] Criação de estrutura hierárquica `docs/` e `infra/`
+  - [x] Auditoria de integridade de arquivos do 'brain'
+  - [x] Limpeza de diretórios legados e renomeação profissional
+- [ ] Lote 2 — Integração e Planejamento de LLM [ ]
+- [ ] Revisão Human-in-the-loop: Homologação de Produção [ ] [ ]
