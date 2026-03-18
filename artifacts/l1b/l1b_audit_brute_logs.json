@@ -1,0 +1,62 @@
+[
+  {
+    "test_id": "FS-ESCAPE",
+    "criterion": "Acesso ao .env do orquestrador",
+    "command": "ls /home/user/.env",
+    "stdout": "",
+    "stderr": "Command exited with code 2 and error:\nls: cannot access '/home/user/.env': No such file or directory\n",
+    "exit_code": -2,
+    "status": "ERROR",
+    "verdict": "PASS"
+  },
+  {
+    "test_id": "NET-HEX-BRIDGE",
+    "criterion": "Alcance ao Host Bridge (172.17.0.1)",
+    "command": "curl -I --connect-timeout 2 172.17.0.1",
+    "stdout": "",
+    "stderr": "Command exited with code 28 and error:\n  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current\n                                 Dload  Upload   Total   Spent    Left  Speed\n\r  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0\r  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0\r  0     0    0     0    0     0      0      0 --:--:--  0:00:01 --:--:--     0\r  0     0    0     0    0     0      0      0 --:--:--  0:00:02 --:--:--     0\ncurl: (28) Failed to connect to 172.17.0.1 port 80 after 2001 ms: Timeout was reached\n",
+    "exit_code": -2,
+    "status": "ERROR",
+    "verdict": "PASS"
+  },
+  {
+    "test_id": "NET-HEX-EXTERNAL",
+    "criterion": "Tentativa de sa\u00edda externa arbitr\u00e1ria (Default Deny)",
+    "command": "curl -I --connect-timeout 2 google.com",
+    "stdout": "",
+    "stderr": "Command exited with code 28 and error:\n  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current\n                                 Dload  Upload   Total   Spent    Left  Speed\n\r  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0\r  0     0    0     0    0     0      0      0 --:--:--  0:00:01 --:--:--     0\r  0     0    0     0    0     0      0      0 --:--:--  0:00:02 --:--:--     0\ncurl: (28) Resolving timed out after 2000 milliseconds\n",
+    "exit_code": -2,
+    "status": "ERROR",
+    "verdict": "PASS"
+  },
+  {
+    "test_id": "SECRET-ESCAPE",
+    "criterion": "Exposi\u00e7\u00e3o de E2B_API_KEY no printenv",
+    "command": "printenv",
+    "stdout": "SHELL=/bin/bash\nE2B_TEMPLATE_ID=rki5dems9wqfm4r03t7g\nE2B_EVENTS_ADDRESS=http://192.0.2.1\nPWD=/home/user\nLOGNAME=user\nHOME=/home/user\nE2B_SANDBOX_ID=i8cyr86k76giu8bkoaanq\nUSER=user\nSHLVL=0\nPS1=\\w $ \nPATH=/usr/local/bin:/usr/bin:/bin:/usr/local/games:/usr/games\nE2B_SANDBOX=true\n_=/usr/bin/printenv\n",
+    "stderr": "",
+    "exit_code": 0,
+    "status": "SUCCESS",
+    "verdict": "PASS"
+  },
+  {
+    "test_id": "APPLY-MUTATION",
+    "criterion": "Ader\u00eancia ao contrato de muta\u00e7\u00e3o estruturada",
+    "command": "MutationSpec: script",
+    "stdout": "HOMOLOGADO_2026\n",
+    "stderr": "",
+    "exit_code": 0,
+    "status": "SUCCESS",
+    "verdict": "PASS"
+  },
+  {
+    "test_id": "LIFECYCLE-DESTROY",
+    "criterion": "Destrui\u00e7\u00e3o at\u00f4mica (Kill) com retorno estruturado",
+    "command": "adapter.destroy()",
+    "stdout": "Exit Status: KILLED",
+    "stderr": "",
+    "exit_code": 0,
+    "status": "SUCCESS",
+    "verdict": "PASS"
+  }
+]
