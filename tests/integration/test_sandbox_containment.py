@@ -16,7 +16,7 @@ from infra.sandbox.adapter import E2BUnsafeAdminSandboxAdapter
     "Sandbox integration tests require AIOS_RUN_SANDBOX_INTEGRATION=1 and E2B_API_KEY.",
 )
 class SandboxContainmentIntegrationTests(unittest.TestCase):
-    def test_default_deny_network_and_filesystem(self) -> None:
+    def test_sandbox_containment_default_deny_network_and_filesystem(self) -> None:
         adapter = E2BUnsafeAdminSandboxAdapter()
         create_res = adapter.create("base")
         self.assertTrue(create_res.success, create_res.error)

@@ -189,7 +189,8 @@ class E2BSandboxAdapter(ISandbox):
         except Exception as e:
             return SandboxOpResult(success=False, error_message=str(e))
 
-    def _read_text_result(self, path: str) -> ReadFileResult:
+    def read_text_file(self, path: str) -> ReadFileResult:
+        """Safe public method for text file reads — no unsafe opt-in required."""
         if not self._sandbox:
             return ReadFileResult(success=False, error="Sandbox not created")
 
@@ -231,7 +232,7 @@ class E2BSandboxAdapter(ISandbox):
 
     def read_file(self, path: str) -> ReadFileResult:
         self._require_unsafe_ops("read_file")
-        return self._read_text_result(path)
+        return self.read_text_file(path)
 
 
 class E2BUnsafeAdminSandboxAdapter(E2BSandboxAdapter):
@@ -271,4 +272,4 @@ class E2BSecureWorkspaceSandbox(ISecureWorkspaceSandbox):
         return self._adapter.write_text_file(dest_path, content)
 
     def read_text_file(self, path: str) -> ReadFileResult:
-        return self._adapter._read_text_result(path)
+        return self._adapter.read_text_file(path)

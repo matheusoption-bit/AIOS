@@ -1,4 +1,3 @@
-import warnings
 import unittest
 
 from infra.sandbox.adapter import (
@@ -27,23 +26,22 @@ class AdapterHardeningTests(unittest.TestCase):
         adapter = E2BSandboxAdapter()
 
         with self.assertRaises(UnsafeSandboxOperationError):
-            getattr(adapter, "run_command")("echo hello", 1.0)
+            adapter.run_command("echo hello", 1.0)
 
         with self.assertRaises(UnsafeSandboxOperationError):
-            getattr(adapter, "apply_mutation")(MutationSpec(script="echo hello"))
+            adapter.apply_mutation(MutationSpec(script="echo hello"))
 
         with self.assertRaises(UnsafeSandboxOperationError):
-            getattr(adapter, "list_files")("/tmp")
+            adapter.list_files("/tmp")
 
         with self.assertRaises(UnsafeSandboxOperationError):
-            getattr(adapter, "read_file")("/tmp/proof.txt")
+            adapter.read_file("/tmp/proof.txt")
 
     def test_explicit_admin_adapter_keeps_legacy_behavior(self) -> None:
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore", RuntimeWarning)
+        with self.assertWarns(RuntimeWarning):
             adapter = E2BUnsafeAdminSandboxAdapter()
 
-        result = getattr(adapter, "run_command")("echo hello", 1.0)
+        result = adapter.run_command("echo hello", 1.0)
         self.assertEqual(result.status, "ERROR")
         self.assertEqual(result.stderr, "Sandbox not created")
 
@@ -51,7 +49,7 @@ class AdapterHardeningTests(unittest.TestCase):
         secure_adapter = E2BSandboxAdapter()
         secure_adapter._sandbox = FakeSandbox({"/tmp/proof.txt": "PROVA L3"})
 
-        result = secure_adapter._read_text_result("/tmp/proof.txt")
+        result = secure_adapter.read_text_file("/tmp/proof.txt")
 
         self.assertTrue(result.success)
         self.assertEqual(result.content, "PROVA L3")
