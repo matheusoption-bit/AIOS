@@ -3,9 +3,7 @@
 Este diretório contém a primeira iteração do Lote 3, que elimina a dependência aberta de *shell commands* entre o Provedor LLM e a Sandbox, substituindo-a por transações declarativas de mutação estritamente validadas.
 
 ## 1. Objetivo Fundamental
-
-No **Lote 2**, o Orquestrador era um transportador neutro ("passador de shell"): o LLM gerava `command: str` e a sandbox executava. Isso mantinha o AIOS vulnerável a injeções ilimitadas e comandos imprevistos.
-No **Lote 3**, o Orquestrador atua como um gatekeeper rigoroso. O contrato mudou para **mutação tipada e estruturada**.
+O novo fluxo do Lote 3 elimina o uso de shell arbitrário na interface com o LLM, substituindo por mutações seguras controladas via runtime. O preexistente Lote 2, no entanto, segue intocado como baseline anterior de I/O de shell livre e ledger endurecido.
 
 ## 2. Escopo Mínimo Implementado
 

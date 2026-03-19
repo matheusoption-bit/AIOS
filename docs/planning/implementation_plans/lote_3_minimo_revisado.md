@@ -1,8 +1,7 @@
 # Planejamento do Lote 3 Mínimo — Revisado
 
 ## 1. Veredito sobre a proposta anterior
-A proposta "Sentinela v1" deve ser **descartada como recorte principal**. 
-Impor um Policy Guard (baseado em análise estática/regex) sobre uma entrada que permite shell arbitrário é combater o sintoma, não a doença. Tentar prever todas as variações maliciosas de bash é um problema insolúvel e arquiteturalmente ingênuo. A primeira linha de defesa não é filtrar o shell genérico, é **eliminar o shell genérico da API do modelo**.
+No âmbito deste novo fluxo, a vulnerabilidade de contrato via shell aberto foi substancialmente contida por uma fronteira determinística, permanecendo o Lote 2 como baseline.
 
 ## 2. Problema estrutural principal do estágio atual
 A análise do código (`src/lote2/response_schema.py` e `src/lote2/lote2_runner.py`) revela a maior fragilidade arquitetural do AIOS hoje: **o tamanho do contrato entre o LLM e a Sandbox**. 
