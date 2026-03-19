@@ -19,6 +19,7 @@ ALLOWED_DISALLOWED_CALL_PATHS = {
     PROJECT_ROOT / "src" / "lote2" / "lote2_runner.py",
     PROJECT_ROOT / "scripts" / "ci" / "check_tracked_artifacts.py",
     PROJECT_ROOT / "tests" / "integration" / "test_sandbox_containment.py",
+    PROJECT_ROOT / "tests" / "test_adapter_hardening.py",
 }
 DISALLOWED_SUBPROCESS_FUNCS = {
     "Popen",

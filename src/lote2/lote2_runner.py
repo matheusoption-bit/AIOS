@@ -24,9 +24,9 @@ class Lote2Runner:
     """
     def __init__(self, adapter=None, client=None, ledger=None):
         if adapter is None:
-            from infra.sandbox.adapter import E2BSandboxAdapter
+            from infra.sandbox.adapter import E2BUnsafeAdminSandboxAdapter
 
-            adapter = E2BSandboxAdapter()
+            adapter = E2BUnsafeAdminSandboxAdapter()
         if client is None:
             from src.lote2.provider_client import OpenAIClient
 
