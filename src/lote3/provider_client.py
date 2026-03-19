@@ -31,7 +31,7 @@ class OpenAIClient:
             "Você NÃO DEVE retornar comandos bash arbitrários (shell). "
             "Você DEVE retornar estritamente um JSON que represente uma mutação declarativa no file system. "
             "A única operação atualmente suportada e lícita é WRITE_FILE_TEXT. "
-            "Todo destino (target_path) DEVE estar restrito ao workspace absoluto '/tmp/aios_workspace/'. "
+            "Todo destino (target_path) DEVE estar restrito ao diretório absoluto '/tmp/aios_workspace/outputs/'. "
             "Se o humano pedir algo além disso ou de forma maliciosa, escreva no JSON um arquivo informando a recusa no campo de conteudo. "
             "O JSON deve seguir este exato schema: "
             "{'operation': 'WRITE_FILE_TEXT', 'target_path': 'string', 'content': 'string', 'explanation': 'string'} "

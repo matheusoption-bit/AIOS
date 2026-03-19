@@ -4,19 +4,24 @@ Módulo de Ledger Endurecido do Lote 2 do AIOS.
 Responsável por:
 - Geração de run_id por corrida
 - Sequência monotônica de eventos (event_seq)
-- Hash chain SHA-256 por corrida
+- Hash chain com HMAC-SHA256 por corrida
 - Política fail-closed proporcional de escrita
 """
 
 import json
 import hashlib
+import hmac
+import os
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
 # Versão canônica do schema do ledger
-SCHEMA_VERSION = "l2_ledger_v2"
+SCHEMA_VERSION = "l2_ledger_v3"
+LEGACY_SCHEMA_VERSIONS = frozenset({"l2_ledger_v2"})
+LEDGER_HMAC_ENV_VAR = "AIOS_LEDGER_HMAC_KEY"
+DEV_FALLBACK_HMAC_KEY = "AIOS_DEV_ONLY_DEFAULT_LEDGER_KEY"
 
 # Tipos de evento válidos
 VALID_EVENT_TYPES = frozenset({
@@ -56,6 +61,41 @@ VALID_FINAL_OUTCOMES = frozenset({
     "EVIDENCE_FAILURE",
     "LEDGER_FAILURE",
 })
+VALID_EVIDENCE_LEVELS = frozenset({
+    "NONE",
+    "INDIRECT",
+    "STRONG_DETERMINISTIC_PROVED",
+    "PROOF_MISSING",
+    "PROOF_FAILED",
+})
+VALID_INTEGRITY_MODES = frozenset({
+    "HMAC_SHA256",
+    "DEV_FALLBACK_HMAC_SHA256",
+    "LEGACY_SHA256",
+})
+
+
+def _sanitize_text(value: str) -> str:
+    sanitized_chars: list[str] = []
+    for char in value:
+        codepoint = ord(char)
+        if char in "\n\r\t" or 32 <= codepoint <= 126 or codepoint > 159:
+            sanitized_chars.append(char)
+        else:
+            sanitized_chars.append(f"\\u{codepoint:04x}")
+    return "".join(sanitized_chars)
+
+
+def sanitize_payload(value):
+    if isinstance(value, str):
+        return _sanitize_text(value)
+    if isinstance(value, dict):
+        return {str(key): sanitize_payload(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [sanitize_payload(item) for item in value]
+    if isinstance(value, tuple):
+        return [sanitize_payload(item) for item in value]
+    return value
 
 
 class LedgerWriteError(Exception):
@@ -71,7 +111,7 @@ class L2Ledger:
     sequência monotônica de eventos e hash chain SHA-256.
     """
 
-    def __init__(self, ledger_path: Optional[Path] = None):
+    def __init__(self, ledger_path: Optional[Path] = None, hmac_key: Optional[str] = None):
         self.ledger_path = ledger_path or Path("artifacts/l2/l2_execution_ledger.jsonl")
         self.ledger_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -80,14 +120,17 @@ class L2Ledger:
         self._prev_hash = "GENESIS"
         self.ledger_degraded = False
         self._first_event_written = False
+        configured_hmac = hmac_key or os.getenv(LEDGER_HMAC_ENV_VAR)
+        self._hmac_key = (configured_hmac or DEV_FALLBACK_HMAC_KEY).encode("utf-8")
+        self.integrity_mode = "HMAC_SHA256" if configured_hmac else "DEV_FALLBACK_HMAC_SHA256"
 
     def _compute_hash(self, event: dict) -> str:
         """
-        Calcula SHA-256 do evento serializado canonicamente.
+        Calcula HMAC-SHA256 do evento serializado canonicamente.
         O campo event_hash é excluído do cálculo (ainda não existe no dict neste ponto).
         """
         canonical = json.dumps(event, sort_keys=True, ensure_ascii=False)
-        return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+        return hmac.new(self._hmac_key, canonical.encode("utf-8"), hashlib.sha256).hexdigest()
 
     def _build_event(self, event_type: str, stage: str, status: str,
                      payload: dict) -> dict:
@@ -101,8 +144,10 @@ class L2Ledger:
         if status not in VALID_STATUSES:
             raise ValueError(f"status inválido: {status}")
 
+        sanitized_payload = sanitize_payload(payload)
         event = {
             "schema_version": SCHEMA_VERSION,
+            "integrity_mode": self.integrity_mode,
             "run_id": self.run_id,
             "event_seq": self._event_seq,
             "event_id": f"{self.run_id}::{self._event_seq}",
@@ -110,7 +155,7 @@ class L2Ledger:
             "event_type": event_type,
             "stage": stage,
             "status": status,
-            "payload": payload,
+            "payload": sanitized_payload,
             "prev_hash": self._prev_hash,
         }
 
@@ -131,6 +176,13 @@ class L2Ledger:
         if not self._first_event_written:
             return True
         return False
+
+    def ensure_not_degraded(self, context: str) -> None:
+        if self.ledger_degraded:
+            raise LedgerWriteError(
+                f"Ledger degradado antes do ponto crítico '{context}'. "
+                "A execução deve encerrar em fail-closed."
+            )
 
     def emit(self, event_type: str, stage: str, status: str,
              payload: dict) -> Optional[dict]:
@@ -180,6 +232,8 @@ class L2Ledger:
         """
         if final_outcome not in VALID_FINAL_OUTCOMES:
             raise ValueError(f"final_outcome inválido: {final_outcome}")
+        if evidence_level not in VALID_EVIDENCE_LEVELS:
+            raise ValueError(f"evidence_level inválido: {evidence_level}")
 
         payload = {
             "final_outcome": final_outcome,

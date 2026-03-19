@@ -18,6 +18,7 @@ import sys
 import os
 import json
 import hashlib
+import hmac
 from pathlib import Path
 from collections import defaultdict
 
@@ -26,13 +27,19 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".
 
 from src.lote2.ledger import (
     SCHEMA_VERSION,
+    LEGACY_SCHEMA_VERSIONS,
+    LEDGER_HMAC_ENV_VAR,
+    DEV_FALLBACK_HMAC_KEY,
     VALID_EVENT_TYPES,
     VALID_STAGES,
     VALID_STATUSES,
-    VALID_FINAL_OUTCOMES
+    VALID_FINAL_OUTCOMES,
+    VALID_EVIDENCE_LEVELS,
+    VALID_INTEGRITY_MODES,
 )
 
 EXPECTED_SCHEMA_VERSION = SCHEMA_VERSION
+SUPPORTED_SCHEMA_VERSIONS = frozenset({SCHEMA_VERSION, *LEGACY_SCHEMA_VERSIONS})
 
 REQUIRED_FIELDS = frozenset({
     "schema_version", "run_id", "event_seq", "event_id",
@@ -45,7 +52,15 @@ def compute_hash(event: dict) -> str:
     """Recalcula o hash do evento (sem o campo event_hash)."""
     event_copy = {k: v for k, v in event.items() if k != "event_hash"}
     canonical = json.dumps(event_copy, sort_keys=True, ensure_ascii=False)
-    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+    integrity_mode = event_copy.get("integrity_mode")
+    if integrity_mode is None and event_copy.get("schema_version") in LEGACY_SCHEMA_VERSIONS:
+        integrity_mode = "LEGACY_SHA256"
+
+    if integrity_mode == "LEGACY_SHA256":
+        return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+    hmac_key = os.getenv(LEDGER_HMAC_ENV_VAR, DEV_FALLBACK_HMAC_KEY).encode("utf-8")
+    return hmac.new(hmac_key, canonical.encode("utf-8"), hashlib.sha256).hexdigest()
 
 
 def validate_ledger(ledger_path: Path) -> bool:
@@ -101,12 +116,20 @@ def validate_ledger(ledger_path: Path) -> bool:
                 run_ok = False
 
             sv = event.get("schema_version")
-            if sv != EXPECTED_SCHEMA_VERSION:
+            if sv not in SUPPORTED_SCHEMA_VERSIONS:
                 errors.append(
-                    f"  Linha {line_num}: schema_version '{sv}' != esperado '{EXPECTED_SCHEMA_VERSION}'"
+                    f"  Linha {line_num}: schema_version '{sv}' não suportado (esperado um de {sorted(SUPPORTED_SCHEMA_VERSIONS)})"
                 )
                 run_ok = False
-            
+
+            integrity_mode = event.get("integrity_mode")
+            if sv == EXPECTED_SCHEMA_VERSION:
+                if integrity_mode not in VALID_INTEGRITY_MODES - {"LEGACY_SHA256"}:
+                    errors.append(
+                        f"  Linha {line_num}: integrity_mode '{integrity_mode}' inválido para schema '{EXPECTED_SCHEMA_VERSION}'"
+                    )
+                    run_ok = False
+
             ev_type = event.get("event_type")
             if ev_type and ev_type not in VALID_EVENT_TYPES:
                 errors.append(f"  Linha {line_num}: event_type inválido '{ev_type}'")
@@ -133,6 +156,21 @@ def validate_ledger(ledger_path: Path) -> bool:
                 expected_status = "OK" if outcome in ("SUCCESS", "PARTIAL_SUCCESS") else "FAIL"
                 if status != expected_status:
                     errors.append(f"  Linha {line_num}: status '{status}' inconsistente com outcome '{outcome}' (esperado '{expected_status}')")
+                    run_ok = False
+
+                evidence_level = payload.get("evidence_level")
+                if evidence_level and evidence_level not in VALID_EVIDENCE_LEVELS:
+                    errors.append(f"  Linha {line_num}: evidence_level inválido '{evidence_level}'")
+                    run_ok = False
+
+                if sv == EXPECTED_SCHEMA_VERSION and payload.get("intent_phase") != "CLOSE":
+                    errors.append(f"  Linha {line_num}: RUN_FINISHED deve registrar intent_phase='CLOSE'")
+                    run_ok = False
+
+            if ev_type == "LLM_CALL" and sv == EXPECTED_SCHEMA_VERSION:
+                payload = event.get("payload", {})
+                if payload.get("intent_phase") != "OPEN":
+                    errors.append(f"  Linha {line_num}: LLM_CALL deve registrar intent_phase='OPEN'")
                     run_ok = False
 
 

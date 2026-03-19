@@ -1,14 +1,14 @@
-name: CI Gate Pos-Lote 3
+name: Sandbox Integration
 
 on:
-  pull_request:
-    branches: [main]
-  push:
-    branches: [main]
+  workflow_dispatch:
 
 jobs:
-  guardrails-and-tests:
+  sandbox-containment:
     runs-on: ubuntu-latest
+    env:
+      AIOS_RUN_SANDBOX_INTEGRATION: "1"
+      E2B_API_KEY: ${{ secrets.E2B_API_KEY }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
@@ -23,11 +23,5 @@ jobs:
           python -m pip install --upgrade pip
           pip install --require-hashes -r requirements.lock
 
-      - name: Check disallowed shell calls
-        run: python scripts/ci/check_disallowed_calls.py
-
-      - name: Check tracked artifacts policy
-        run: python scripts/ci/check_tracked_artifacts.py
-
-      - name: Run offline test suite
-        run: python -m unittest discover -s tests -p "test_*.py" -v
+      - name: Run sandbox containment integration tests
+        run: python -m unittest discover -s tests/integration -p "test_*.py" -v

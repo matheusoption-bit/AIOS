@@ -1,27 +1,32 @@
 import sys
 import os
-import tempfile
-from pathlib import Path
 
 # Adiciona a raiz do projeto ao sys.path para imports relativos funcionarem
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 
-from infra.sandbox.adapter import E2BSandboxAdapter
-from src.lote3.provider_client import OpenAIClient
 from src.lote3.path_policy import validate_safe_path, PathViolationError
+from src.lote3.policy_guard import evaluate_write_intent
 from src.lote2.ledger import L2Ledger, LedgerWriteError
 from pydantic import ValidationError
-from openai import APITimeoutError
 
 class Lote3Runner:
     """
     Runner de integração do Lote 3: Structured Mutation Boundary.
     O Orquestrador não é mais um passador cego de bash. Ele compila intents estruturados.
     """
-    def __init__(self):
-        self.adapter = E2BSandboxAdapter()
-        self.client = OpenAIClient()
-        self.ledger = L2Ledger() # Reaproveitando Ledger endurecido do Lote 2
+    def __init__(self, adapter=None, client=None, ledger=None):
+        if adapter is None:
+            from infra.sandbox.adapter import E2BSecureWorkspaceSandbox
+
+            adapter = E2BSecureWorkspaceSandbox()
+        if client is None:
+            from src.lote3.provider_client import OpenAIClient
+
+            client = OpenAIClient()
+
+        self.adapter = adapter
+        self.client = client
+        self.ledger = ledger or L2Ledger() # Reaproveitando Ledger endurecido do Lote 2
 
     def run(self, user_instruction: str, expected_fail: bool = False):
         print(f"\n[AIOS L3] {'MODO SMOKE TEST (Ilícito esperado)' if expected_fail else 'Execução Regular/Lícita'}")
@@ -36,9 +41,12 @@ class Lote3Runner:
             self.ledger.emit("LLM_CALL", "PROVIDER", "OK", {
                 "instruction": user_instruction,
                 "expected_fail": expected_fail,
-                "lote": "LOTE_3_STRUCTURED_MUTATION"
+                "lote": "LOTE_3_STRUCTURED_MUTATION",
+                "intent_phase": "OPEN",
+                "intent_kind": "WRITE_FILE_TEXT",
             })
-            
+            self.ledger.ensure_not_degraded("provider_boundary")
+
             raw_response, parsed_intent = self.client.get_completion(user_instruction)
 
             self.ledger.emit("LLM_RESPONSE", "PROVIDER", "OK", {
@@ -47,6 +55,7 @@ class Lote3Runner:
                 "content_size": len(parsed_intent.content),
                 "explanation": parsed_intent.explanation,
             })
+            self.ledger.ensure_not_degraded("provider_response")
 
         except ValidationError as e:
             print(f"[ERRO] Resposta do Provider violou o schema estrito de mutação: {e}")
@@ -54,6 +63,20 @@ class Lote3Runner:
             self._force_finish("PROVIDER_FAILURE", "Schema de mutação violado.")
             return
         except Exception as e:
+            timeout_error = None
+            try:
+                from openai import APITimeoutError
+
+                timeout_error = APITimeoutError
+            except ImportError:
+                timeout_error = None
+
+            if timeout_error and isinstance(e, timeout_error):
+                print(f"[ERRO] Timeout na chamada ao Provider: {e}")
+                self.ledger.emit("LLM_RESPONSE", "PROVIDER", "FAIL", {"error": "PROVIDER_TIMEOUT"})
+                self._force_finish("PROVIDER_FAILURE", "Timeout na chamada ao Provider.")
+                return
+
             print(f"[ERRO] Falha no Provider: {e}")
             self.ledger.emit("LLM_RESPONSE", "PROVIDER", "FAIL", {"error": str(e)})
             self._force_finish("PROVIDER_FAILURE", str(e))
@@ -64,12 +87,32 @@ class Lote3Runner:
         try:
             safe_path = validate_safe_path(parsed_intent.target_path)
             print(f"[AIOS L3] Caminho validado com sucesso: {safe_path}")
-            
-            # Novo evento usando a taxonomia base do L2 (aproveitando flexibilidade do payload)
-            self.ledger.emit("POLICY_CHECK", "RUNTIME", "OK", {
+
+            guard_result = evaluate_write_intent(safe_path, parsed_intent.content)
+            self.ledger.emit("POLICY_CHECK", "RUNTIME", "FAIL" if guard_result.should_block else "OK", {
                 "requested_path": parsed_intent.target_path,
-                "resolved_path": safe_path
+                "resolved_path": safe_path,
+                "policy_mode": guard_result.mode,
+                "policy_action": guard_result.action,
+                "findings": [
+                    {
+                        "rule_id": finding.rule_id,
+                        "severity": finding.severity,
+                        "message": finding.message,
+                    }
+                    for finding in guard_result.findings
+                ],
             })
+            self.ledger.ensure_not_degraded("policy_boundary")
+            if guard_result.action == "warning":
+                print("[AIOS L3] Policy guard registrou warning(s) em shadow mode sem bloquear a corrida.")
+            if guard_result.should_block:
+                self._force_finish(
+                    "SECURITY_VIOLATION",
+                    "Mutação bloqueada pelo policy guard antes da sandbox.",
+                    evidence="NONE",
+                )
+                return
         except PathViolationError as e:
             msg = f"Mutação interceptada pelo Policy Guard: {e}"
             print(f"[BLOQUEIO DE SEGURANÇA] {msg}")
@@ -88,19 +131,12 @@ class Lote3Runner:
             return
 
         self.ledger.emit("SANDBOX_CREATE", "SANDBOX", "OK", {"sandbox_id": create_res.sandbox_id})
+        self.ledger.ensure_not_degraded("sandbox_create")
 
         # ── 4. Setup do Workspace Base e Mutação Estruturada ──
         try:
-            # Para respeitar a interface ISandbox do Lote 1/2 sem alterá-la, usamos copy_in
             print(f"[AIOS L3] Aplicando mutação '{parsed_intent.operation}' em '{safe_path}'...")
-            
-            with tempfile.NamedTemporaryFile(mode='w', delete=False, encoding='utf-8') as tmp_file:
-                tmp_file.write(parsed_intent.content)
-                tmp_file_path = tmp_file.name
-
-            # Copia para dentro da sandbox (I/O seguro)
-            copy_res = self.adapter.copy_in(tmp_file_path, safe_path)
-            os.remove(tmp_file_path)
+            copy_res = self.adapter.write_text_file(safe_path, parsed_intent.content)
 
             if not copy_res.success:
                  raise RuntimeError(f"Falha no copy_in: {copy_res.error_message}")
@@ -110,10 +146,11 @@ class Lote3Runner:
                 "target_path": safe_path,
                 "bytes_written": copy_res.bytes_written
             })
+            self.ledger.ensure_not_degraded("sandbox_mutation")
 
             # ── 5. Coleta de Evidência Determinística ──
             print(f"[AIOS L3] Verificando evidência lendo {safe_path}...")
-            read_res = self.adapter.read_file(safe_path)
+            read_res = self.adapter.read_text_file(safe_path)
 
             if read_res.success and read_res.content == parsed_intent.content:
                 evidence_level = "STRONG_DETERMINISTIC_PROVED"
@@ -156,15 +193,13 @@ class Lote3Runner:
         print(f"[AIOS L3] Ledger atualizado em {self.ledger.ledger_path}")
 
     def _force_finish(self, outcome: str, summary: str, evidence: str = "NONE", destroy_payload: dict = None):
-        try:
-            self.ledger.emit_run_finished(
-                final_outcome=outcome,
-                evidence_level=evidence,
-                summary=summary,
-                destroy_result=destroy_payload
-            )
-        except LedgerWriteError:
-            pass
+        self.ledger.emit_run_finished(
+            final_outcome=outcome,
+            evidence_level=evidence,
+            summary=summary,
+            intent_phase="CLOSE",
+            destroy_result=destroy_payload
+        )
 
 if __name__ == "__main__":
     has_openai = bool(os.getenv("OPENAI_API_KEY"))
