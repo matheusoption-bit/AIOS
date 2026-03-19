@@ -2,3 +2,5 @@
 /venv/
 __pycache__/
 *.pyc
+# Artefatos de execução local — não entrar no repositório
+artifacts/l2/l2_execution_ledger.jsonl

@@ -45,5 +45,8 @@
 - [x] Implementação do Primeiro Slice Funcional do Lote 2 (Provider + Sandbox)
 - [x] Lote 2 — Slice mínimo local consolidado (Provider + Sandbox + Mock-safe)
 - [x] Lote 2 — Prova ponta a ponta com credenciais reais (HOMOLOGADO)
-- [x] Revisão Human-in-the-loop: Homologação de Produção (Circuito Fechado)
+- [x] Lote 2 — Revisão Human-in-the-loop: Homologação de Produção (Circuito Fechado)
 - [x] Lote 2 — Endurecimento do Ledger (hash chain, run_id, event_seq, schema_version, validador, fail-closed)
+- [x] Lote 3 — Cancelamento formal da Sentinela em prol da Mutação Estruturada (Boundary)
+- [x] Lote 3 — Definição do contrato estrito WriteFileIntent e Path Policy limitador
+- [x] Lote 3 — Implementação e homologação local isolada do Runner de Mutação

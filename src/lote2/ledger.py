@@ -22,8 +22,10 @@ SCHEMA_VERSION = "l2_ledger_v2"
 VALID_EVENT_TYPES = frozenset({
     "LLM_CALL",
     "LLM_RESPONSE",
+    "POLICY_CHECK",
     "SANDBOX_CREATE",
     "SANDBOX_EXEC",
+    "SANDBOX_MUTATION",
     "EVIDENCE_CHECK",
     "RUN_FINISHED",
 })
@@ -31,6 +33,7 @@ VALID_EVENT_TYPES = frozenset({
 # Estágios válidos
 VALID_STAGES = frozenset({
     "PROVIDER",
+    "RUNTIME",
     "SANDBOX",
     "EVIDENCE",
     "FINALIZATION",
@@ -47,6 +50,7 @@ VALID_STATUSES = frozenset({
 VALID_FINAL_OUTCOMES = frozenset({
     "SUCCESS",
     "PARTIAL_SUCCESS",
+    "SECURITY_VIOLATION",
     "PROVIDER_FAILURE",
     "SANDBOX_FAILURE",
     "EVIDENCE_FAILURE",
