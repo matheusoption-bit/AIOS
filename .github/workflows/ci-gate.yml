@@ -1,0 +1,65 @@
+name: CI Gate Pós-Lote 3
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint-and-guardrails:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      # 1. Proibir uso de subprocess/os.system em código Python
+      - name: Check for disallowed shell calls
+        run: |
+          if grep -R "subprocess" -n src/ || grep -R "os\.system" -n src/; then
+            echo "❌ Uso de subprocess ou os.system encontrado";
+            exit 1;
+          else
+            echo "✅ Nenhum subprocess ou os.system encontrado";
+          fi
+
+      # 2. Garantir que artefatos operacionais não estejam versionados
+      - name: Verify no operational artifacts are tracked
+        run: |
+          tracked=$(git ls-files "artifacts/*" | wc -l)
+          if [ "$tracked" -gt 0 ]; then
+            echo "❌ Artefatos operacionais versionados:";
+            git ls-files "artifacts/*";
+            exit 1;
+          else
+            echo "✅ Nenhum artefato operacional versionado";
+          fi
+
+      # 3. Validar ledger JSONL (se existir)
+      - name: Validate L2 ledger format
+        run: |
+          ledger_path="artifacts/l2/l2_execution_ledger.jsonl"
+          if [ -f "$ledger_path" ]; then
+            python - <<'PY'
+import json, sys
+path = "artifacts/l2/l2_execution_ledger.jsonl"
+with open(path, "r", encoding="utf-8") as f:
+    for i, line in enumerate(f, 1):
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            obj = json.loads(line)
+        except json.JSONDecodeError as e:
+            print(f"❌ JSON inválido na linha {i}: {e}")
+            sys.exit(1)
+        # campos mínimos esperados
+        required = ["run_id", "event_type", "timestamp"]
+        if not all(k in obj for k in required):
+            print(f"❌ Campo ausente na linha {i}: esperado {required}")
+            sys.exit(1)
+print("✅ Ledger validado com sucesso")
+PY
+          else
+            echo "⚠️ Ledger não encontrado, pulando validação"
+          fi
