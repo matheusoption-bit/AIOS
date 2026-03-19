@@ -1,9 +1,8 @@
-
 import os
 import json
-import time
 from pathlib import Path
-from e2b_adapter_v0 import E2BSandboxAdapter, MutationSpec
+
+from infra.sandbox.adapter import E2BSandboxAdapter, MutationSpec
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 ARTIFACTS_DIR = PROJECT_ROOT / "artifacts" / "l1b"

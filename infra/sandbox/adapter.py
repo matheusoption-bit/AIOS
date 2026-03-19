@@ -1,10 +1,9 @@
-
 import os
 import hashlib
 from pathlib import Path
-from typing import List, Optional, Dict, Any, Union
+from typing import List, Optional
 from abc import ABC, abstractmethod
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from e2b import Sandbox
 from dotenv import load_dotenv
 
@@ -76,6 +75,20 @@ class ISandbox(ABC):
     
     @abstractmethod
     def read_file(self, path: str) -> ReadFileResult: pass
+
+
+class ISecureWorkspaceSandbox(ABC):
+    @abstractmethod
+    def create(self, baseline_ref: str) -> SandboxCreateResult: pass
+
+    @abstractmethod
+    def destroy(self) -> SandboxDestroyResult: pass
+
+    @abstractmethod
+    def write_text_file(self, dest_path: str, content: str) -> SandboxOpResult: pass
+
+    @abstractmethod
+    def read_text_file(self, path: str) -> ReadFileResult: pass
 
 # --- Implementação Adaptador E2B Homologado ---
 
@@ -158,6 +171,17 @@ class E2BSandboxAdapter(ISandbox):
         except Exception as e:
             return SandboxOpResult(success=False, error_message=str(e))
 
+    def write_text_file(self, dest_path: str, content: str) -> SandboxOpResult:
+        if not self._sandbox:
+            return SandboxOpResult(success=False, error_message="Sandbox not created")
+
+        try:
+            payload = content.encode("utf-8")
+            self._sandbox.files.write(dest_path, payload)
+            return SandboxOpResult(success=True, bytes_written=len(payload))
+        except Exception as e:
+            return SandboxOpResult(success=False, error_message=str(e))
+
     def list_files(self, path: str) -> ListFilesResult:
         if not self._sandbox:
             return ListFilesResult(success=False, files=[], error="Sandbox not created")
@@ -185,3 +209,26 @@ class E2BSandboxAdapter(ISandbox):
             return ReadFileResult(success=True, content=text_content, hash_sha256=h)
         except Exception as e:
             return ReadFileResult(success=False, error=str(e))
+
+
+class E2BSecureWorkspaceSandbox(ISecureWorkspaceSandbox):
+    """
+    Facade segura para o caminho oficial do runtime.
+
+    Expõe apenas lifecycle, escrita textual parametrizada e leitura de evidência.
+    """
+
+    def __init__(self, adapter: Optional[E2BSandboxAdapter] = None):
+        self._adapter = adapter or E2BSandboxAdapter()
+
+    def create(self, baseline_ref: str) -> SandboxCreateResult:
+        return self._adapter.create(baseline_ref)
+
+    def destroy(self) -> SandboxDestroyResult:
+        return self._adapter.destroy()
+
+    def write_text_file(self, dest_path: str, content: str) -> SandboxOpResult:
+        return self._adapter.write_text_file(dest_path, content)
+
+    def read_text_file(self, path: str) -> ReadFileResult:
+        return self._adapter.read_file(path)

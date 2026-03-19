@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from typing import Optional
 
 class LLMResponse(BaseModel):
@@ -8,10 +8,12 @@ class LLMResponse(BaseModel):
     command: str = Field(..., description="O comando shell a ser executado na sandbox.")
     explanation: Optional[str] = Field(None, description="Explicação opcional do raciocínio do modelo.")
 
-    class Config:
-        schema_extra = {
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={
             "example": {
                 "command": "echo 'Hello AIOS' > README.md",
                 "explanation": "Criando um arquivo README de boas-vindas."
             }
         }
+    )

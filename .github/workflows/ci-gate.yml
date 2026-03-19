@@ -1,0 +1,33 @@
+name: CI Gate Pos-Lote 3
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  guardrails-and-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+
+      - name: Set up Python
+        uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install --require-hashes -r requirements.lock
+
+      - name: Check disallowed shell calls
+        run: python scripts/ci/check_disallowed_calls.py
+
+      - name: Check tracked artifacts policy
+        run: python scripts/ci/check_tracked_artifacts.py
+
+      - name: Run offline test suite
+        run: python -m unittest discover -s tests -p "test_*.py" -v

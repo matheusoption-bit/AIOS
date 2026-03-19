@@ -1,0 +1,27 @@
+name: Sandbox Integration
+
+on:
+  workflow_dispatch:
+
+jobs:
+  sandbox-containment:
+    runs-on: ubuntu-latest
+    env:
+      AIOS_RUN_SANDBOX_INTEGRATION: "1"
+      E2B_API_KEY: ${{ secrets.E2B_API_KEY }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+
+      - name: Set up Python
+        uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install --require-hashes -r requirements.lock
+
+      - name: Run sandbox containment integration tests
+        run: python -m unittest discover -s tests/integration -p "test_*.py" -v
