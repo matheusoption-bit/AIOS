@@ -1,4 +1,3 @@
-import os
 from pathlib import PurePosixPath
 
 WORKSPACE_ROOT = "/tmp/aios_workspace"
@@ -7,49 +6,47 @@ class PathViolationError(Exception):
     """Exceção levantada quando uma tentativa de mutação escapa do workspace."""
     pass
 
+
 def validate_safe_path(target_path: str) -> str:
     """
-    Garante que o path absoluto resultante esteja contido estritamente
-    dentro de WORKSPACE_ROOT Linux (PurePosixPath), já que a execução cai na E2B.
-    Rejeita path traversal ('..') e aberturas relativas para cima.
-    
-    Retorna o path absoluto validado em formato UNIX ou levanta PathViolationError.
+    Garante que o path resultante esteja contido ESTRITAMENTE dentro de
+    WORKSPACE_ROOT (lógica Linux / E2B Sandbox).
+
+    Regras:
+    - Path vazio é rejeitado.
+    - Path relativo é resolvido contra WORKSPACE_ROOT.
+    - Path absoluto é aceito apenas se ficar dentro de WORKSPACE_ROOT.
+    - Path traversal ('..') é neutralizado via PurePosixPath antes da checagem.
+    - Sibling directories (/tmp/aios_workspace_hacker/) são rejeitados.
+
+    Retorna o path canônico POSIX aceito, sem dupla barra.
+    Lança PathViolationError nos demais casos.
     """
-    if not target_path:
+    if not target_path or not target_path.strip():
         raise PathViolationError("Path de destino não pode ser vazio.")
 
-    # Converte para Path POSIX
-    p_target = PurePosixPath(target_path)
-    
-    # Se for relativo, ajeitamos contra a base
-    if not p_target.is_absolute():
-        p_target = PurePosixPath(WORKSPACE_ROOT) / p_target
+    workspace = PurePosixPath(WORKSPACE_ROOT)
+    raw = PurePosixPath(target_path.strip())
 
-    # Verifica travessias como /tmp/aios_workspace/../../etc/passwd
-    # Em termos puramente léxicos (sem tocar em disco local):
-    parts = p_target.parts
-    resolved_parts = []
-    
-    for part in parts:
-        if part == "..":
-            if resolved_parts:
-                resolved_parts.pop()
-        elif part != "." and part != "":
-            resolved_parts.append(part)
-            
-    # Remonta o caminho absoluto resolvido
-    final_path = PurePosixPath("/".join(resolved_parts))
-    if not str(final_path).startswith("/"):
-        final_path = PurePosixPath("/" + str(final_path))
+    # Paths relativos são resolvidos dentro do workspace
+    if not raw.is_absolute():
+        candidate = workspace / raw
+    else:
+        candidate = raw
 
-    workspace_path = PurePosixPath(WORKSPACE_ROOT)
+    # Canonicalizar: resolve '..' e '.' sem acesso a disco
+    # PurePosixPath("/a/b/../c") == PurePosixPath("/a/c") não colapsa automaticamente,
+    # então simplificamos via os.path.normpath (puramente léxico no POSIX)
+    import posixpath
+    canonical_str = posixpath.normpath(str(candidate))
+    canonical = PurePosixPath(canonical_str)
 
-    # Convert para string
-    str_final = str(final_path)
-    str_workspace = str(workspace_path)
-    
-    # Checa se o path cai perfeitamente dentro da raiz estipulada
-    if not str_final.startswith(str_workspace):
-         raise PathViolationError(f"Tentativa de path traversal bloqueada: '{target_path}' resolve para '{str_final}' que escapa de '{str_workspace}'.")
+    # Verificação de contenção hierárquica estrita
+    if not canonical.is_relative_to(workspace):
+        raise PathViolationError(
+            f"Tentativa de path traversal ou escape bloqueada: "
+            f"'{target_path}' resolve para '{canonical_str}' "
+            f"que fica fora de '{WORKSPACE_ROOT}'."
+        )
 
-    return str_final
+    return canonical_str
