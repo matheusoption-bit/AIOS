@@ -10,6 +10,9 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".
 from infra.sandbox.adapter import E2BSandboxAdapter
 from src.lote2.provider_client import OpenAIClient
 from src.lote2.response_schema import LLMResponse
+from src.lote2.ledger import L2Ledger, LedgerWriteError
+from pydantic import ValidationError
+from openai import APITimeoutError
 
 # Configuração Determinística de Integridade (Smoke Test)
 SMOKE_TEST_INSTRUCTION = "Crie o arquivo /tmp/l2_proof.txt com o conteúdo 'SUCESSO_L2_DETERMINISTICO'"
@@ -19,91 +22,204 @@ SMOKE_TEST_EXPECTED_CONTENT = "SUCESSO_L2_DETERMINISTICO"
 class Lote2Runner:
     """
     Runner de integração do Lote 2: O circuito fechado funcional do AIOS.
+    Agora com ledger endurecido (hash chain, run_id, eventos granulares).
     """
     def __init__(self):
         self.adapter = E2BSandboxAdapter()
         self.client = OpenAIClient()
-        self.artifact_path = Path("artifacts/l2/l2_execution_ledger.jsonl")
-        self.artifact_path.parent.mkdir(parents=True, exist_ok=True)
-
-    def log_event(self, event_data: dict):
-        """
-        Registra evento no ledger mínimo do Lote 2 (JSONL).
-        """
-        event_data["timestamp"] = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
-        with open(self.artifact_path, "a", encoding="utf-8") as f:
-            f.write(json.dumps(event_data, ensure_ascii=False) + "\n")
+        self.ledger = L2Ledger()
 
     def run(self, user_instruction: str, is_smoke_test: bool = False):
         print(f"\n[AIOS L2] {'MODO SMOKE TEST' if is_smoke_test else 'Execução Regular'}")
         print(f"[AIOS L2] Instrução: '{user_instruction}'")
-        
-        # 1. Chamada ao Provider (FORA da Sandbox)
+        print(f"[AIOS L2] Run ID: {self.ledger.run_id}")
+
+        evidence_level = "NONE"
+        final_outcome = "SUCCESS"
+
+        # ── 1. Chamada ao Provider (FORA da Sandbox) ──
         try:
+            # Evento: início da chamada ao provider
+            try:
+                self.ledger.emit("LLM_CALL", "PROVIDER", "OK", {
+                    "instruction": user_instruction,
+                    "is_smoke_test": is_smoke_test,
+                })
+            except LedgerWriteError as e:
+                print(f"[ERRO FATAL] {e}")
+                return
+
             raw_response, parsed_response = self.client.get_completion(user_instruction)
-            
-            self.log_event({
-                "type": "LLM_DECISION",
-                "instruction": user_instruction,
-                "is_smoke_test": is_smoke_test,
+
+            # Evento: resposta do provider recebida e parseada
+            self.ledger.emit("LLM_RESPONSE", "PROVIDER", "OK", {
                 "raw_response": raw_response,
-                "command": parsed_response.command
+                "command": parsed_response.command,
+                "explanation": parsed_response.explanation,
             })
-            
+
+        except LedgerWriteError as e:
+            # LedgerWriteError do LLM_RESPONSE (primeiro evento já escrito, então é intermediário)
+            # Continua com degradação — o emit já setou ledger_degraded
+            print(f"[AVISO] Ledger degradado no estágio PROVIDER: {e}")
+        except ValidationError as e:
+            print(f"[ERRO] Resposta do Provider violou o schema: {e}")
+            self.ledger.emit("LLM_RESPONSE", "PROVIDER", "FAIL", {
+                "error": "JSON_SCHEMA_VIOLATION",
+                "details": str(e),
+            })
+            try:
+                self.ledger.emit_run_finished(
+                    final_outcome="PROVIDER_FAILURE",
+                    summary="Falha na validação do schema da resposta do provider",
+                )
+            except LedgerWriteError as le:
+                print(f"[ERRO FATAL] Não foi possível registrar RUN_FINISHED: {le}")
+            return
+        except APITimeoutError as e:
+            print(f"[ERRO] Timeout na chamada ao Provider: {e}")
+            self.ledger.emit("LLM_RESPONSE", "PROVIDER", "ERROR", {
+                "error": "PROVIDER_TIMEOUT",
+                "details": str(e),
+            })
+            try:
+                self.ledger.emit_run_finished(
+                    final_outcome="PROVIDER_FAILURE",
+                    summary="Timeout na chamada ao provider",
+                )
+            except LedgerWriteError as le:
+                print(f"[ERRO FATAL] Não foi possível registrar RUN_FINISHED: {le}")
+            return
         except Exception as e:
-            print(f"[ERRO] Falha no Provider: {str(e)}")
-            self.log_event({"type": "FAILURE", "reason": "LLM_CALL_FAILED", "error": str(e)})
+            print(f"[ERRO] Falha generica no Provider: {e}")
+            self.ledger.emit("LLM_RESPONSE", "PROVIDER", "FAIL", {
+                "error": str(e),
+            })
+            try:
+                self.ledger.emit_run_finished(
+                    final_outcome="PROVIDER_FAILURE",
+                    summary=f"Falha na chamada ao provider: {e}",
+                )
+            except LedgerWriteError as le:
+                print(f"[ERRO FATAL] Não foi possível registrar RUN_FINISHED: {le}")
             return
 
-        # 2. Execução na Sandbox (DEFAULT DENY ativado por padrão)
-        print(f"[AIOS L2] Criando Sandbox E2B...")
+        # ── 2. Criação da Sandbox ──
+        print("[AIOS L2] Criando Sandbox E2B...")
         create_res = self.adapter.create("base")
+
         if not create_res.success:
             print(f"[ERRO] Falha ao criar sandbox: {create_res.error}")
-            self.log_event({"type": "FAILURE", "reason": "SANDBOX_CREATE_FAILED", "error": create_res.error})
+            self.ledger.emit("SANDBOX_CREATE", "SANDBOX", "FAIL", {
+                "error": create_res.error,
+            })
+            try:
+                self.ledger.emit_run_finished(
+                    final_outcome="SANDBOX_FAILURE",
+                    summary=f"Falha ao criar sandbox: {create_res.error}",
+                )
+            except LedgerWriteError as le:
+                print(f"[ERRO FATAL] Não foi possível registrar RUN_FINISHED: {le}")
             return
 
+        self.ledger.emit("SANDBOX_CREATE", "SANDBOX", "OK", {
+            "sandbox_id": create_res.sandbox_id,
+        })
+
+        # ── 3. Execução na Sandbox ──
         try:
             print(f"[AIOS L2] Executando comando: {parsed_response.command}")
             exec_res = self.adapter.run_command(parsed_response.command, timeout_seconds=30.0)
-            
-            # 3. Coleta de Evidência Determinística (Se for smoke test ou sugerido)
-            evidence = None
-            if is_smoke_test:
-                print(f"[AIOS L2] Verificando evidência determinística em {SMOKE_TEST_ARTIFACT}...")
-                read_res = self.adapter.read_file(SMOKE_TEST_ARTIFACT)
-                if read_res.success and SMOKE_TEST_EXPECTED_CONTENT in (read_res.content or ""):
-                    evidence = "STRONG_DETERMINISTIC_PROVED"
-                    print("[AIOS L2] EVIDÊNCIA FORTE CONFIRMADA.")
-                else:
-                    evidence = "EVIDENCE_NOT_FOUND"
-                    print("[AVISO] Comando executou mas evidência não foi encontrada.")
 
-            self.log_event({
-                "type": "SANDBOX_EXECUTION",
+            self.ledger.emit("SANDBOX_EXEC", "SANDBOX", "OK" if exec_res.exit_code == 0 else "FAIL", {
                 "command": parsed_response.command,
                 "exit_code": exec_res.exit_code,
                 "status": exec_res.status,
-                "evidence_level": evidence or "INDIRECT",
                 "stdout": exec_res.stdout,
-                "stderr": exec_res.stderr
+                "stderr": exec_res.stderr,
             })
-            
-            print(f"[AIOS L2] Fluxo concluído. Status Sandbox: {exec_res.status}")
-            
-        except Exception as e:
-            msg = f"Erro na execução da sandbox: {str(e)}"
-            print(f"[ERRO] {msg}")
-            self.log_event({"type": "FAILURE", "reason": "SANDBOX_RUNTIME_ERROR", "error": str(e)})
-        finally:
-            self.adapter.destroy()
 
-        print("[AIOS L2] Ciclo finalizado. Ledger atualizado em artifacts/l2/")
+            if exec_res.exit_code != 0:
+                final_outcome = "SANDBOX_FAILURE"
+
+            # ── 4. Coleta de Evidência Determinística ──
+            if is_smoke_test:
+                print(f"[AIOS L2] Verificando evidência determinística em {SMOKE_TEST_ARTIFACT}...")
+                read_res = self.adapter.read_file(SMOKE_TEST_ARTIFACT)
+
+                if read_res.success and SMOKE_TEST_EXPECTED_CONTENT in (read_res.content or ""):
+                    evidence_level = "STRONG_DETERMINISTIC_PROVED"
+                    print("[AIOS L2] EVIDÊNCIA FORTE CONFIRMADA.")
+                    self.ledger.emit("EVIDENCE_CHECK", "EVIDENCE", "OK", {
+                        "artifact_path": SMOKE_TEST_ARTIFACT,
+                        "evidence_level": evidence_level,
+                        "content_match": True,
+                    })
+                else:
+                    evidence_level = "EVIDENCE_NOT_FOUND"
+                    final_outcome = "EVIDENCE_FAILURE"
+                    print("[AVISO] Comando executou mas evidência não foi encontrada.")
+                    self.ledger.emit("EVIDENCE_CHECK", "EVIDENCE", "FAIL", {
+                        "artifact_path": SMOKE_TEST_ARTIFACT,
+                        "evidence_level": evidence_level,
+                        "content_match": False,
+                        "read_success": read_res.success,
+                        "read_error": read_res.error,
+                    })
+            else:
+                evidence_level = "INDIRECT"
+
+        except Exception as e:
+            msg = f"Erro na execução da sandbox: {e}"
+            print(f"[ERRO] {msg}")
+            self.ledger.emit("SANDBOX_EXEC", "SANDBOX", "ERROR", {
+                "error": str(e),
+            })
+            final_outcome = "SANDBOX_FAILURE"
+
+        # ── 5. Evento Terminal ──
+        destroy_payload = None
+        try:
+            destroy_res = self.adapter.destroy()
+            if not destroy_res.success:
+                print(f"[AVISO] Falha ao destruir Sandbox: {destroy_res.error_message}")
+            destroy_payload = {
+                "success": destroy_res.success,
+                "exit_status": destroy_res.exit_status,
+                "error": destroy_res.error_message
+            }
+        except Exception as e:
+            print(f"[ERRO] Exceção inesperada no Cleanup da Sandbox: {e}")
+            destroy_payload = {
+                "success": False,
+                "exit_status": "CLEANUP_FAILED",
+                "error": str(e)
+            }
+
+        try:
+            # Injeta campo de destroy_result em SUMMARY/Payload
+            extra_summary_info = ""
+            if destroy_payload and not destroy_payload['success']:
+                extra_summary_info = f" [Aviso: Destroy da Sandbox Falhou: {destroy_payload['error']}]"
+
+            finished_event = self.ledger.emit_run_finished(
+                final_outcome=final_outcome,
+                evidence_level=evidence_level,
+                summary=f"Corrida finalizada. Outcome: {final_outcome}.{extra_summary_info}",
+                destroy_result=destroy_payload
+            )
+        except LedgerWriteError as e:
+            print(f"[ERRO FATAL] Não foi possível registrar RUN_FINISHED: {e}")
+
+        print(f"[AIOS L2] Ciclo finalizado. Outcome: {final_outcome}")
+        print(f"[AIOS L2] Ledger atualizado em {self.ledger.ledger_path}")
+        if self.ledger.ledger_degraded:
+            print("[AVISO] Ledger degradado — alguns eventos intermediários podem ter sido perdidos.")
 
 if __name__ == "__main__":
     runner = Lote2Runner()
-    
-    # Check for credentials
+
+    # Verificação de credenciais
     has_openai = bool(os.getenv("OPENAI_API_KEY"))
     has_e2b = bool(os.getenv("E2B_API_KEY"))
 
@@ -115,5 +231,3 @@ if __name__ == "__main__":
         print("  AVISO: CREDENCIAIS AUSENTES (OPENAI_API_KEY ou E2B_API_KEY)")
         print("  O Runner está pronto para execução real, mas exige chaves no .env")
         print("!"*60 + "\n")
-        
-        # Teste de carga a seco (somente schema) pode ser feito via testes unitários.

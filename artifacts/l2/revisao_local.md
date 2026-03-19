@@ -1,52 +1,46 @@
-# Pacote de Revisão Local: Consolidação Lote 2 AIOS
+# Pacote de Revisão Local: Endurecimento do Ledger — Lote 2 AIOS
 
-Este documento serve como guia para a inspeção humana da consolidação local do Lote 2.
+Este documento registra as alterações realizadas no endurecimento do ledger do Lote 2.
 
 ## 1. Resumo das Alterações
-Foram aplicadas melhorias de robustez, tratamento de erros e fortalecimento de evidências de execução.
+
+O ledger do Lote 2 foi endurecido para elevar rastreabilidade, integridade e utilidade operacional.
 
 ### Arquivos Novos
-- `example.env`: Referência de configuração para setup local.
-- `artifacts/l2/revisao_local.md`: Este documento de auditoria.
+- `src/lote2/ledger.py`: Helper de ledger com hash chain SHA-256, `run_id`, `event_seq` monotônico, `schema_version` e política fail-closed proporcional.
+- `src/lote2/validate_ledger.py`: Validador de integridade multi-run com 6 checagens.
 
 ### Arquivos Alterados
-- `src/lote2/provider_client.py`: Melhoria na captura de erros e logs de integração.
-- `src/lote2/lote2_runner.py`: Implementação do **Smoke Test** e evidência determinística.
-- `artifacts/l2/README.md`: Instruções atualizadas para teste local.
+- `src/lote2/lote2_runner.py`: Reescrito para emitir 6 tipos de evento granulares via `L2Ledger`.
+- `artifacts/l2/README.md`: Documentação do ledger endurecido.
+- `docs/planning/status/task_tracking.md`: Item do endurecimento adicionado.
+
+### Backup
+- `artifacts/l2/l2_execution_ledger.jsonl.pre_hardening`: Ledger legado preservado antes do endurecimento.
 
 ## 2. Destaques Técnicos
 
-- **Evidência Determinística**: O runner agora possui lógica para validar fisicamente a criação de arquivos de prova na sandbox.
-- **Isolamento Confirmado**: Política `DEFAULT DENY` (sem acesso a internet na sandbox) rigorosamente aplicada.
-- **Modernização**: Logs padronizados com timestamps UTC ISO-8601.
+- **Hash Chain SHA-256**: cada evento encadeia com o anterior via `prev_hash` / `event_hash`.
+- **`run_id`**: UUID4 por corrida, permitindo correlação de todos os eventos de uma execução.
+- **`event_seq` monotônico**: ordem explícita e verificável dentro de cada corrida.
+- **`schema_version`**: campo `l2_ledger_v2` em cada evento para facilitar migração futura.
+- **`RUN_FINISHED`**: veredito final inequívoco com `final_outcome` e `evidence_level`.
+- **`ledger_degraded`**: flag booleano registrado no `RUN_FINISHED` se houve perda de evento intermediário.
+- **Política Fail-Closed**: falha no primeiro evento ou em `RUN_FINISHED` aborta a corrida.
 
-## 3. Como Revisar Localmente
+## 3. Verificação Executada
 
-1. **Configuração**: Verifique se `example.env` está claro.
-2. **Código**: Inspecione o `lote2_runner.py` para entender o fluxo do Smoke Test.
-3. **Teste Sego (Sem Chaves)**: Execute `python src/lote2/lote2_runner.py` e confirme se o aviso de credenciais ausentes é amigável e informativo.
-4. **Teste Real (Com Chaves)**: O runner foi executado com chaves reais e confirmou o Smoke Test completo, gerando o ledger em `artifacts/l2/` com nível de evidência `STRONG_DETERMINISTIC_PROVED`.
+- **Compilação**: `py_compile` de `ledger.py`, `lote2_runner.py` e `validate_ledger.py` — OK.
+- **Execução real**: Runner executado com credenciais reais (OpenAI + E2B). Smoke test ponta a ponta com evidência forte confirmada.
+- **Validação do ledger**: `validate_ledger.py` confirmou integridade completa — 1 corrida, 6 eventos, hash chain OK, `RUN_FINISHED` presente e terminal.
+- **Rejeição do legado**: Validador rejeitou corretamente o ledger `.pre_hardening` (formato antigo, sem schema novo).
 
-## 4. Veredito de Prontidão
+## 4. Veredito
 
-**Veredito: `PRONTO PARA PUBLICAR (HOMOLOGADO E2E)`**
+**Veredito: LEDGER ENDURECIDO — OPERACIONALMENTE SÓLIDO**
 
-**Justificativa**: A implementação foi validada através de uma execução real ponta a ponta. O sistema chamou o provedor LLM, obteve JSON válido, executou o comando na sandbox isolada e confirmou a persistência dos dados via prova de fumaça física. O Lote 2 atingiu o "Definition of Done".
-
-## 5. Sugestão de Commit
-
-**Mensagem Curta:**
-`feat(lote2): consolidate local implementation and strengthen evidence`
-
-**Mensagem Expandida:**
-```text
-Consolidate Lote 2 minimal implementation with a focus on reliability.
-- Improved OpenAI provider client with better error handling.
-- Implemented deterministic Smoke Test in the runner.
-- Added file-based evidence verification via ISandbox instance.
-- Standardized UTC logging in the execution ledger.
-- Created example.env and updated local documentation in artifacts/l2/.
-```
+O ledger passou de registro solto a trilha de auditoria com correlação, encadeamento, integridade verificável e veredito final inequívoco. Suficiente para avançar ao próximo item da trilha.
 
 ---
 *Assinado: Operador Técnico Principal (IDE Antigravity)*
+*Data: 2026-03-19*
