@@ -4,11 +4,11 @@
 - **Mounts:** Apenas o diretório de workspace deve ser montado como `RW`. Todos os outros diretórios de runtime necessários devem ser `RO`.
 - **Symlink Protection:** Seguimento de symlinks que apontem para fora do boundary virtualizado deve ser bloqueado.
 
-## 2. Network (Core Property - Tese B)
-- **Política Mandatória:** **Isolamento de Host + Egress Controlado**.
+## 2. Network (Core Property - Default Deny)
+- **Política Mandatória:** **DEFAULT DENY**.
 - **Isolamento de Host:** Bloqueio absoluto de alcance a `localhost` do orquestrador, redes de bridge (ex: `172.17.0.1`) e IPs privados da rede local da infraestrutura.
-- **Egress (Saída):** Em ambientes Cloud/Managed (E2B), a saída para a internet é permitida por padrão para viabilizar ferramentas, mas deve ser tratada como canal de exfiltração monitorado no Lote 2.
-- **DNS:** Resolução externa permitida em Tese B.
+- **Egress (Saída):** A saída para a internet é **bloqueada por padrão** na Fase 1 para garantir a contenção absoluta. Chamadas a APIs de LLM devem ser mediadas pelo orquestrador fora desta boundary.
+- **DNS:** Resolução externa desabilitada ou ineficaz devido ao bloqueio de rede.
 
 ## 3. Privilégios (Core Property)
 - **User:** O código deve rodar como um usuário sem privilégios (`non-root`).

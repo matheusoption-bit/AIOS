@@ -5,9 +5,9 @@ O adaptador **E2B Sandbox** atingiu o selo de auditoria para produção. A bound
 
 ---
 
-## 2. Decisão de Política de Rede (Tese B)
+## 2. Decisão de Política de Rede (Default Deny)
 - **Status:** **HOMOLOGADO**.
-- **Justificativa:** Adotada a **Tese B (Host Isolation + Egress Controlado)**. A saída para a internet é permitida para ferramentas de runtime, mas o alcance ao host (`172.17.0.1`), `localhost` e redes locais sensíveis está bloqueado.
+- **Justificativa:** Adotada a política de **Default Deny**. O bloqueio de rede externa é um requisito de segurança para garantir o isolamento da boundary. O alcance ao host (`172.17.0.1`), `localhost` e redes locais está plenamente bloqueado.
 
 ---
 
@@ -17,7 +17,7 @@ O adaptador **E2B Sandbox** atingiu o selo de auditoria para produção. A bound
 | :--- | :--- | :--- | :--- | :--- |
 | **FS-ESCAPE** | Bloqueio de escape para host | `ls /home/user/.env` | 2 (Error) | **PASS** |
 | **NET-BRIDGE** | Bloqueio de alcance ao orquestrador | `curl 172.17.0.1` | 28 (Timeout) | **PASS** |
-| **NET-EXTERNAL** | Saída controlada (Tese B) | `curl google.com` | 0 (Success) | **PASS** |
+| **NET-EXTERNAL** | Bloqueio de saída externa (Default Deny) | `curl google.com` | -2 (Error) | **PASS** |
 | **SECRET-ESCAPE** | Vazamento zero de credenciais | `printenv` | 0 (Success) | **PASS** |
 | **MUTATION** | Contrato `apply_mutation` | `MutationSpec` script | 0 (Success) | **PASS** |
 | **DESTROY** | Retorno `SandboxDestroyResult` | `adapter.destroy()` | N/A | **PASS** |

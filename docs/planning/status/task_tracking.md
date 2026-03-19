@@ -36,9 +36,13 @@
 - [x] Lote 1 da Fase 1: Isolamento de Sandbox (Encerrado Arquiteturalmente)
   - [x] Etapa 1: Threat Model e Especificação
   - [x] Lote 1B — Validação Empírica da Boundary (Homologação 100%)
+- [x] Reconciliação Canônica do Sandbox (Política Default Deny)
 - [x] Auditoria e Reorganização Profissional de Artefatos
   - [x] Criação de estrutura hierárquica `docs/` e `infra/`
   - [x] Auditoria de integridade de arquivos do 'brain'
   - [x] Limpeza de diretórios legados e renomeação profissional
-- [ ] Lote 2 — Integração e Planejamento de LLM [ ]
-- [ ] Revisão Human-in-the-loop: Homologação de Produção [ ] [ ]
+- [x] Abertura Formal do Lote 2 Mínimo (Spec Operacional)
+- [x] Implementação do Primeiro Slice Funcional do Lote 2 (Provider + Sandbox)
+- [x] Lote 2 — Slice mínimo local consolidado (Provider + Sandbox + Mock-safe)
+- [x] Lote 2 — Prova ponta a ponta com credenciais reais (HOMOLOGADO)
+- [x] Revisão Human-in-the-loop: Homologação de Produção (Circuito Fechado)

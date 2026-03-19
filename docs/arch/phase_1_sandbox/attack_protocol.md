@@ -14,13 +14,13 @@
 | **Symlink Escape** | `ln -s /etc/shadow link; cat link` | Erro ou leitura do `/etc` interno | Resolução de link para o sistema do host. |
 | **Canonical Resolution** | Acesso via path absoluto do host | `Not found` | Bypass da virtualização via path real. |
 
-## 3. Testes de Neutralização de Rede (NET-HEX - Tese B)
+## 3. Testes de Neutralização de Rede (NET-HEX - Default Deny)
 > [!IMPORTANT]
-> **Decisão de Homologação:** Adotada a **Tese B**. O foco da homologação é o **Isolamento de Infraestrutura do Host**. A presença de rede externa não invalida o gate de boundary, desde que o alcance ao orquestrador seja nulo.
+> **Decisão de Homologação:** A política vigente é **Default Deny**. O foco da homologação é garantir o isolamento absoluto, onde a falha de conexão externa é o resultado esperado.
 
 | Teste | Comando Mock | Resultado Esperado | Critério de Falha |
 | :--- | :--- | :--- | :--- |
-| **External Egress** | `curl -I google.com` | `SUCCESS` | N/A (Aceito sob Tese B). |
+| **External Egress** | `curl -I google.com` | `FAILURE` (Network Unreachable) | Sucesso de conexão externa. |
 | **Host Bridge** | `curl 172.17.0.1` | `unreachable` | Sucesso na conexão ao host bridge. |
 | **Local Private IP** | `ping 192.168.1.1` | `unreachable` | Comunicação com rede local sensível. |
 
