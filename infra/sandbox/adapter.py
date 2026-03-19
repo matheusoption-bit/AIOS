@@ -189,6 +189,24 @@ class E2BSandboxAdapter(ISandbox):
         except Exception as e:
             return SandboxOpResult(success=False, error_message=str(e))
 
+    def _read_text_result(self, path: str) -> ReadFileResult:
+        if not self._sandbox:
+            return ReadFileResult(success=False, error="Sandbox not created")
+
+        try:
+            content = self._sandbox.files.read(path)
+            if isinstance(content, bytes):
+                text_content = content.decode("utf-8")
+                raw_bytes = content
+            else:
+                text_content = content
+                raw_bytes = content.encode("utf-8")
+
+            digest = hashlib.sha256(raw_bytes).hexdigest()
+            return ReadFileResult(success=True, content=text_content, hash_sha256=digest)
+        except Exception as e:
+            return ReadFileResult(success=False, error=str(e))
+
     def write_text_file(self, dest_path: str, content: str) -> SandboxOpResult:
         if not self._sandbox:
             return SandboxOpResult(success=False, error_message="Sandbox not created")
@@ -213,22 +231,7 @@ class E2BSandboxAdapter(ISandbox):
 
     def read_file(self, path: str) -> ReadFileResult:
         self._require_unsafe_ops("read_file")
-        if not self._sandbox:
-            return ReadFileResult(success=False, error="Sandbox not created")
-        
-        try:
-            content = self._sandbox.files.read(path)
-            if isinstance(content, bytes):
-                text_content = content.decode('utf-8')
-                raw_bytes = content
-            else:
-                text_content = content
-                raw_bytes = content.encode('utf-8')
-            
-            h = hashlib.sha256(raw_bytes).hexdigest()
-            return ReadFileResult(success=True, content=text_content, hash_sha256=h)
-        except Exception as e:
-            return ReadFileResult(success=False, error=str(e))
+        return self._read_text_result(path)
 
 
 class E2BUnsafeAdminSandboxAdapter(E2BSandboxAdapter):
@@ -268,4 +271,4 @@ class E2BSecureWorkspaceSandbox(ISecureWorkspaceSandbox):
         return self._adapter.write_text_file(dest_path, content)
 
     def read_text_file(self, path: str) -> ReadFileResult:
-        return self._adapter.read_file(path)
+        return self._adapter._read_text_result(path)
