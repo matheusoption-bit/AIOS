@@ -8,7 +8,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from infra.sandbox.adapter import E2BSandboxAdapter
+from infra.sandbox.adapter import E2BUnsafeAdminSandboxAdapter
 
 
 @unittest.skipUnless(
@@ -17,7 +17,7 @@ from infra.sandbox.adapter import E2BSandboxAdapter
 )
 class SandboxContainmentIntegrationTests(unittest.TestCase):
     def test_default_deny_network_and_filesystem(self) -> None:
-        adapter = E2BSandboxAdapter()
+        adapter = E2BUnsafeAdminSandboxAdapter()
         create_res = adapter.create("base")
         self.assertTrue(create_res.success, create_res.error)
 

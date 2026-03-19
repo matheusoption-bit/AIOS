@@ -1,5 +1,6 @@
 import os
 import hashlib
+import warnings
 from pathlib import Path
 from typing import List, Optional
 from abc import ABC, abstractmethod
@@ -52,6 +53,10 @@ class MutationSpec(BaseModel):
     script: str
     description: Optional[str] = None
 
+
+class UnsafeSandboxOperationError(RuntimeError):
+    """Levantada quando uma primitive sensível é usada sem opt-in explícito."""
+
 # --- Interface ISandbox (CONTRATO CANÔNICO FASE 1) ---
 
 class ISandbox(ABC):
@@ -93,9 +98,10 @@ class ISecureWorkspaceSandbox(ABC):
 # --- Implementação Adaptador E2B Homologado ---
 
 class E2BSandboxAdapter(ISandbox):
-    def __init__(self, api_key: str = None):
+    def __init__(self, api_key: str = None, *, allow_unsafe_ops: bool = False):
         self._api_key = api_key or os.getenv("E2B_API_KEY")
         self._sandbox: Optional[Sandbox] = None
+        self._allow_unsafe_ops = allow_unsafe_ops
 
     def create(self, baseline_ref: str) -> SandboxCreateResult:
         """
@@ -135,7 +141,18 @@ class E2BSandboxAdapter(ISandbox):
         except Exception as e:
             return SandboxDestroyResult(success=False, exit_status="CLEANUP_FAILED", error_message=str(e))
 
+    def _require_unsafe_ops(self, operation_name: str) -> None:
+        if self._allow_unsafe_ops:
+            return
+
+        raise UnsafeSandboxOperationError(
+            f"{operation_name} é uma primitive insegura do adapter bruto e exige opt-in explícito. "
+            "Use E2BUnsafeAdminSandboxAdapter para fluxos legados/admin ou prefira E2BSecureWorkspaceSandbox "
+            "no caminho seguro do runtime."
+        )
+
     def run_command(self, command: str, timeout_seconds: float) -> ExecutionResult:
+        self._require_unsafe_ops("run_command")
         if not self._sandbox:
             return ExecutionResult(status="ERROR", stdout="", stderr="Sandbox not created", exit_code=-1)
         
@@ -156,6 +173,7 @@ class E2BSandboxAdapter(ISandbox):
         """
         Implementação inicial de mutação via shell script (patch/sed/etc).
         """
+        self._require_unsafe_ops("apply_mutation")
         print(f"[E2B] Aplicando mutação: {mutation.description or 'Sem descrição'}")
         return self.run_command(mutation.script, 30.0)
 
@@ -183,6 +201,7 @@ class E2BSandboxAdapter(ISandbox):
             return SandboxOpResult(success=False, error_message=str(e))
 
     def list_files(self, path: str) -> ListFilesResult:
+        self._require_unsafe_ops("list_files")
         if not self._sandbox:
             return ListFilesResult(success=False, files=[], error="Sandbox not created")
         
@@ -193,6 +212,7 @@ class E2BSandboxAdapter(ISandbox):
             return ListFilesResult(success=False, files=[], error=str(e))
 
     def read_file(self, path: str) -> ReadFileResult:
+        self._require_unsafe_ops("read_file")
         if not self._sandbox:
             return ReadFileResult(success=False, error="Sandbox not created")
         
@@ -209,6 +229,23 @@ class E2BSandboxAdapter(ISandbox):
             return ReadFileResult(success=True, content=text_content, hash_sha256=h)
         except Exception as e:
             return ReadFileResult(success=False, error=str(e))
+
+
+class E2BUnsafeAdminSandboxAdapter(E2BSandboxAdapter):
+    """
+    Adapter bruto para fluxos legados/admin.
+
+    Mantém primitives sensíveis disponíveis, mas exige escolha explícita do chamador.
+    """
+
+    def __init__(self, api_key: str = None):
+        warnings.warn(
+            "E2BUnsafeAdminSandboxAdapter habilita run_command/apply_mutation/list_files/read_file. "
+            "Use apenas em fluxos legados/admin controlados.",
+            RuntimeWarning,
+            stacklevel=2,
+        )
+        super().__init__(api_key=api_key, allow_unsafe_ops=True)
 
 
 class E2BSecureWorkspaceSandbox(ISecureWorkspaceSandbox):

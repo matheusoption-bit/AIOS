@@ -2,7 +2,7 @@ import os
 import json
 from pathlib import Path
 
-from infra.sandbox.adapter import E2BSandboxAdapter, MutationSpec
+from infra.sandbox.adapter import E2BUnsafeAdminSandboxAdapter, MutationSpec
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 ARTIFACTS_DIR = PROJECT_ROOT / "artifacts" / "l1b"
@@ -12,7 +12,7 @@ def run_audit_benchmark():
     print("  BENCHMARK DE AUDITORIA FINAL (L1B-FINAL): E2B SANDBOX")
     print("="*70 + "\n")
 
-    adapter = E2BSandboxAdapter()
+    adapter = E2BUnsafeAdminSandboxAdapter()
     ARTIFACTS_DIR.mkdir(parents=True, exist_ok=True)
     
     # 1. CRIAÇÃO
