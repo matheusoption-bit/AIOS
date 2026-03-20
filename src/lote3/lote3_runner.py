@@ -104,8 +104,11 @@ class Lote3Runner:
                 ],
             })
             self.ledger.ensure_not_degraded("policy_boundary")
-            if guard_result.action == "warning":
-                print("[AIOS L3] Policy guard registrou warning(s) em shadow mode sem bloquear a corrida.")
+            if guard_result.findings and not guard_result.should_block:
+                if guard_result.mode == "shadow":
+                    print("[AIOS L3] Policy guard registrou finding(s) em shadow mode sem bloquear a corrida.")
+                else:
+                    print("[AIOS L3] Policy guard registrou apenas finding(s) não bloqueáveis em enforce mode.")
             if guard_result.should_block:
                 self._force_finish(
                     "SECURITY_VIOLATION",
@@ -160,14 +163,25 @@ class Lote3Runner:
                     "evidence_level": evidence_level,
                     "content_match": True,
                 })
-            else:
-                evidence_level = "EVIDENCE_FAILURE"
-                final_outcome = "SANDBOX_FAILURE"
-                print("[AVISO] Comando executou mas evidência de conteúdo falhou.")
+            elif read_res.success:
+                evidence_level = "PROOF_FAILED"
+                final_outcome = "EVIDENCE_FAILURE"
+                print("[AVISO] Mutação aplicada, mas a evidência divergiu do conteúdo esperado.")
                 self.ledger.emit("EVIDENCE_CHECK", "EVIDENCE", "FAIL", {
                     "artifact_path": safe_path,
                     "evidence_level": evidence_level,
                     "content_match": False,
+                })
+            else:
+                evidence_level = "PROOF_MISSING"
+                final_outcome = "EVIDENCE_FAILURE"
+                print("[AVISO] Mutação aplicada, mas a evidência não pôde ser obtida.")
+                self.ledger.emit("EVIDENCE_CHECK", "EVIDENCE", "FAIL", {
+                    "artifact_path": safe_path,
+                    "evidence_level": evidence_level,
+                    "content_match": False,
+                    "read_success": read_res.success,
+                    "read_error": read_res.error,
                 })
 
         except Exception as e:

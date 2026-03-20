@@ -32,6 +32,36 @@ class CIGuardrailTests(unittest.TestCase):
         )
         self.assertTrue(any("os.popen" in message for message in messages))
 
+    def test_detects_aliased_os_popen_call(self) -> None:
+        messages = self._collect_messages(
+            "src/example.py",
+            """
+            import os
+
+            danger = os.popen
+            danger("id")
+            """,
+        )
+        self.assertTrue(
+            any("aliased disallowed callable" in message and "os.popen" in message for message in messages),
+            messages,
+        )
+
+    def test_does_not_flag_alias_of_homonymous_non_admin_method(self) -> None:
+        messages = self._collect_messages(
+            "src/example.py",
+            """
+            class Storage:
+                def copy_in(self):
+                    return "ok"
+
+            storage = Storage()
+            alias = storage.copy_in
+            alias()
+            """,
+        )
+        self.assertFalse(any("aliased disallowed callable" in message for message in messages), messages)
+
     def test_detects_exec_builtin(self) -> None:
         messages = self._collect_messages(
             "tests/example_test.py",
@@ -49,3 +79,22 @@ class CIGuardrailTests(unittest.TestCase):
             """,
         )
         self.assertTrue(any("dynamic getattr import" in message for message in messages))
+
+    def test_detects_direct_copy_in_call(self) -> None:
+        messages = self._collect_messages(
+            "src/example.py",
+            """
+            adapter.copy_in("host.txt", "/tmp/aios_workspace/outputs/proof.txt")
+            """,
+        )
+        self.assertTrue(any("copy_in" in message for message in messages))
+
+    def test_write_text_file_is_not_classified_as_admin_call(self) -> None:
+        messages = self._collect_messages(
+            "src/example.py",
+            """
+            sandbox.write_text_file("/tmp/aios_workspace/outputs/proof.txt", "ok")
+            """,
+        )
+
+        self.assertFalse(any("write_text_file" in message for message in messages), messages)

@@ -178,6 +178,7 @@ class E2BSandboxAdapter(ISandbox):
         return self.run_command(mutation.script, 30.0)
 
     def copy_in(self, source_path: str, dest_path: str) -> SandboxOpResult:
+        self._require_unsafe_ops("copy_in")
         if not self._sandbox:
             return SandboxOpResult(success=False, error_message="Sandbox not created")
         
@@ -244,7 +245,7 @@ class E2BUnsafeAdminSandboxAdapter(E2BSandboxAdapter):
 
     def __init__(self, api_key: str = None):
         warnings.warn(
-            "E2BUnsafeAdminSandboxAdapter habilita run_command/apply_mutation/list_files/read_file. "
+            "E2BUnsafeAdminSandboxAdapter habilita copy_in/run_command/apply_mutation/list_files/read_file. "
             "Use apenas em fluxos legados/admin controlados.",
             RuntimeWarning,
             stacklevel=2,
@@ -269,7 +270,31 @@ class E2BSecureWorkspaceSandbox(ISecureWorkspaceSandbox):
         return self._adapter.destroy()
 
     def write_text_file(self, dest_path: str, content: str) -> SandboxOpResult:
-        return self._adapter.write_text_file(dest_path, content)
+        try:
+            from src.lote3.path_policy import PathViolationError, validate_safe_path
+
+            safe_dest_path = validate_safe_path(dest_path)
+        except PathViolationError as e:
+            return SandboxOpResult(
+                success=False,
+                error_message=f"write_text_file bloqueado fora do workspace seguro: {e}",
+            )
+        except Exception as e:
+            return SandboxOpResult(success=False, error_message=str(e))
+
+        return self._adapter.write_text_file(safe_dest_path, content)
 
     def read_text_file(self, path: str) -> ReadFileResult:
-        return self._adapter.read_text_file(path)
+        try:
+            from src.lote3.path_policy import PathViolationError, validate_safe_path
+
+            safe_path = validate_safe_path(path)
+        except PathViolationError as e:
+            return ReadFileResult(
+                success=False,
+                error=f"read_text_file bloqueado fora do workspace seguro: {e}",
+            )
+        except Exception as e:
+            return ReadFileResult(success=False, error=str(e))
+
+        return self._adapter.read_text_file(safe_path)

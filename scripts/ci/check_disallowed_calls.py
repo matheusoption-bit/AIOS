@@ -54,6 +54,7 @@ DISALLOWED_BUILTINS = {
     "compile",
 }
 DISALLOWED_ADMIN_METHODS = {
+    "copy_in",
     "run_command",
     "apply_mutation",
     "list_files",
@@ -71,6 +72,7 @@ class ViolationCollector(ast.NodeVisitor):
         self.direct_os_funcs: set[str] = set()
         self.importlib_aliases: set[str] = set()
         self.direct_import_module_funcs: set[str] = set()
+        self.callable_aliases: dict[str, str] = {}
 
     @property
     def is_allowlisted(self) -> bool:
@@ -110,11 +112,47 @@ class ViolationCollector(ast.NodeVisitor):
                     self.direct_import_module_funcs.add(alias.asname or alias.name)
         self.generic_visit(node)
 
+    def visit_Assign(self, node: ast.Assign) -> None:
+        if len(node.targets) == 1 and isinstance(node.targets[0], ast.Name):
+            target_name = node.targets[0].id
+            value = node.value
+            aliased_callable = None
+
+            if isinstance(value, ast.Name):
+                if value.id in DISALLOWED_BUILTINS:
+                    aliased_callable = f"builtin '{value.id}'"
+                elif value.id in self.direct_subprocess_funcs:
+                    aliased_callable = f"subprocess function '{value.id}'"
+                elif value.id in self.direct_os_funcs:
+                    aliased_callable = f"os function '{value.id}'"
+                elif value.id in self.callable_aliases:
+                    aliased_callable = self.callable_aliases[value.id]
+            elif isinstance(value, ast.Attribute) and isinstance(value.value, ast.Name):
+                if value.value.id in self.os_aliases and value.attr in DISALLOWED_OS_FUNCS:
+                    aliased_callable = f"os.{value.attr}"
+                elif value.value.id in self.subprocess_aliases and value.attr in DISALLOWED_SUBPROCESS_FUNCS:
+                    aliased_callable = f"subprocess.{value.attr}"
+
+            if aliased_callable is None:
+                self.callable_aliases.pop(target_name, None)
+            else:
+                self.callable_aliases[target_name] = aliased_callable
+
+        self.generic_visit(node)
+
     def visit_Call(self, node: ast.Call) -> None:
         func = node.func
 
         if isinstance(func, ast.Name) and func.id in DISALLOWED_BUILTINS and not self.is_allowlisted:
             self.violations.append((node.lineno, f"builtin '{func.id}' is not allowed"))
+
+        if isinstance(func, ast.Name) and func.id in self.callable_aliases and not self.is_allowlisted:
+            self.violations.append(
+                (
+                    node.lineno,
+                    f"aliased disallowed callable '{func.id}' -> {self.callable_aliases[func.id]} is not allowed",
+                )
+            )
 
         if isinstance(func, ast.Attribute) and isinstance(func.value, ast.Name):
             if func.value.id in self.os_aliases and func.attr in DISALLOWED_OS_FUNCS and not self.is_allowlisted:
@@ -246,7 +284,7 @@ def main() -> int:
             print(f" - {rel_path}:{lineno}: {message}")
         return 1
 
-    print("No disallowed shell calls or lote3 shell regressions found.")
+    print("No disallowed shell or sandbox-admin calls found.")
     return 0
 
 
