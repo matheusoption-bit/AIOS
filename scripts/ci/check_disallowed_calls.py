@@ -54,6 +54,7 @@ DISALLOWED_BUILTINS = {
     "compile",
 }
 DISALLOWED_ADMIN_METHODS = {
+    "copy_in",
     "run_command",
     "apply_mutation",
     "list_files",
@@ -246,7 +247,7 @@ def main() -> int:
             print(f" - {rel_path}:{lineno}: {message}")
         return 1
 
-    print("No disallowed shell calls or lote3 shell regressions found.")
+    print("No disallowed shell or sandbox-admin calls found.")
     return 0
 
 

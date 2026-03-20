@@ -32,8 +32,12 @@ class PolicyGuardResult:
     findings: tuple[PolicyFinding, ...]
 
     @property
+    def has_blockable_findings(self) -> bool:
+        return any(finding.severity == "block" for finding in self.findings)
+
+    @property
     def should_block(self) -> bool:
-        return self.action == "blocked_enforcing"
+        return self.mode == "enforce" and self.has_blockable_findings
 
 
 def _normalize_mode(mode: str | None = None) -> str:
@@ -68,12 +72,14 @@ def evaluate_write_intent(safe_path: str, content: str, mode: str | None = None)
                 )
             )
 
-    if any(finding.severity == "block" for finding in findings):
-        action: Literal["passed", "warning", "blocked_enforcing"] = "blocked_enforcing"
-    elif findings:
-        action = "warning"
+    has_blockable_findings = any(finding.severity == "block" for finding in findings)
+
+    if not findings:
+        action: Literal["passed", "warning", "blocked_enforcing"] = "passed"
+    elif normalized_mode == "enforce" and has_blockable_findings:
+        action = "blocked_enforcing"
     else:
-        action = "passed"
+        action = "warning"
 
     return PolicyGuardResult(
         mode=normalized_mode,

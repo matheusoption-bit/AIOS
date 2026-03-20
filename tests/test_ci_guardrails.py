@@ -49,3 +49,22 @@ class CIGuardrailTests(unittest.TestCase):
             """,
         )
         self.assertTrue(any("dynamic getattr import" in message for message in messages))
+
+    def test_detects_direct_copy_in_call(self) -> None:
+        messages = self._collect_messages(
+            "src/example.py",
+            """
+            adapter.copy_in("host.txt", "/tmp/aios_workspace/outputs/proof.txt")
+            """,
+        )
+        self.assertTrue(any("copy_in" in message for message in messages))
+
+    def test_write_text_file_is_not_classified_as_admin_call(self) -> None:
+        messages = self._collect_messages(
+            "src/example.py",
+            """
+            sandbox.write_text_file("/tmp/aios_workspace/outputs/proof.txt", "ok")
+            """,
+        )
+
+        self.assertFalse(any("write_text_file" in message for message in messages), messages)
