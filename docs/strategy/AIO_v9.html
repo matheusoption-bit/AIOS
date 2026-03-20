@@ -1,0 +1,794 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-time="night">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover, user-scalable=no" />
+<meta name="theme-color" content="#050507" id="metaThemeColor" />
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>AIOS V9 — Guia Estratégico Curado</title>
+<style>
+/* =========================================
+   CORE VARIABLES & TIME-OF-DAY THEMES
+   ========================================= */
+:root {
+  /* Night (Deep Space) - Default */
+  --bg: #050507;
+  --text: #ffffff;
+  --muted: #8e96a4;
+  --glass-bg: rgba(26, 26, 30, 0.45);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-border-strong: rgba(255, 255, 255, 0.15);
+  --glass-shadow: 0 40px 80px rgba(0, 0, 0, 0.6);
+  --glass-inset: inset 0 1px 1px rgba(255, 255, 255, 0.15);
+  --accent: #2f80ed;
+  --accent-2: #8b5cf6;
+  --accent-3: #ec4899;
+  --cam-yellow: #ffcc00;
+
+  --radius-lg: 32px; --radius-md: 24px; --radius-sm: 16px; --blur: 40px;
+  --safe-top: env(safe-area-inset-top, 20px);
+  --safe-bottom: env(safe-area-inset-bottom, 20px);
+  --content: 1200px; --text-scale: 1;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+/* Theme: Dawn (Amanhecer) */
+html[data-time="dawn"] {
+  --bg: #140d1a; --text: #fdf2f8; --muted: #a78bba;
+  --glass-bg: rgba(45, 25, 60, 0.4);
+  --accent: #d946ef; --accent-2: #8b5cf6;
+}
+/* Theme: Day (Dia) */
+html[data-time="day"] {
+  --bg: #f0f4f8; --text: #111827; --muted: #6b7280;
+  --glass-bg: rgba(255, 255, 255, 0.65);
+  --glass-border: rgba(0, 0, 0, 0.05); --glass-border-strong: rgba(0, 0, 0, 0.1);
+  --glass-shadow: 0 30px 60px rgba(0, 0, 0, 0.08); --glass-inset: inset 0 1px 1px rgba(255, 255, 255, 0.8);
+  --accent: #2563eb; --accent-2: #059669;
+}
+/* Theme: Afternoon (Entardecer) */
+html[data-time="afternoon"] {
+  --bg: #1a1410; --text: #fffdeb; --muted: #b89c8a;
+  --glass-bg: rgba(50, 30, 15, 0.45);
+  --accent: #f59e0b; --accent-2: #ea580c;
+}
+/* Theme: Dusk (Crepúsculo) */
+html[data-time="dusk"] {
+  --bg: #0f172a; --text: #f0f9ff; --muted: #7dd3fc;
+  --glass-bg: rgba(15, 25, 45, 0.5);
+  --accent: #0ea5e9; --accent-2: #6366f1;
+}
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html { scroll-behavior: smooth; }
+
+body {
+  margin: 0; font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Inter", sans-serif;
+  color: var(--text); font-size: calc(16px * var(--text-scale)); line-height: 1.58;
+  min-height: 100vh; overflow-x: hidden; background-color: var(--bg);
+  transition: background-color 1s ease, color 1s ease;
+}
+
+/* =========================================
+   MESH GRADIENTS DINÂMICOS (AURORA ENGINE)
+   ========================================= */
+body::before { content: ""; position: fixed; inset: 0; z-index: -2; pointer-events: none; filter: blur(80px); transition: background 1.5s ease; }
+html[data-time="night"] body::before { background: radial-gradient(circle at 15% 0%, rgba(139,92,246,.15), transparent 40%), radial-gradient(circle at 85% 15%, rgba(47,128,237,.15), transparent 45%), radial-gradient(circle at 50% 100%, rgba(16,185,129,.08), transparent 50%); }
+html[data-time="dawn"] body::before { background: radial-gradient(circle at 20% 0%, rgba(236,72,153,.2), transparent 50%), radial-gradient(circle at 80% 20%, rgba(139,92,246,.2), transparent 50%), radial-gradient(circle at 50% 100%, rgba(245,158,11,.1), transparent 50%); }
+html[data-time="day"] body::before { background: radial-gradient(circle at 10% 0%, rgba(59,130,246,.1), transparent 40%), radial-gradient(circle at 90% 10%, rgba(16,185,129,.1), transparent 40%); }
+html[data-time="afternoon"] body::before { background: radial-gradient(circle at 80% 0%, rgba(245,158,11,.2), transparent 50%), radial-gradient(circle at 20% 30%, rgba(234,88,12,.15), transparent 50%); }
+html[data-time="dusk"] body::before { background: radial-gradient(circle at 50% 0%, rgba(14,165,233,.2), transparent 50%), radial-gradient(circle at 10% 80%, rgba(99,102,241,.15), transparent 50%); }
+
+/* Ruído Físico */
+body::after { content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: 0.03; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E"); }
+
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(150, 150, 150, 0.2); border-radius: 10px; }
+
+/* =========================================
+   UTILITIES & APPLE GLASS
+   ========================================= */
+.glass {
+  background: var(--glass-bg); backdrop-filter: blur(var(--blur)) saturate(180%); -webkit-backdrop-filter: blur(var(--blur)) saturate(180%);
+  border: 1px solid var(--glass-border); box-shadow: var(--glass-shadow), var(--glass-inset);
+  position: relative; overflow: hidden; transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1), border-color 0.4s, box-shadow 0.4s, background-color 1s ease;
+}
+.glass::before { content: ''; position: absolute; inset: 0; border-radius: inherit; opacity: 0.02; pointer-events: none; z-index: -1; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+
+.text-gradient { background: linear-gradient(135deg, var(--accent), var(--accent-2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.mono { font-family: var(--mono); font-feature-settings: "tnum" on, "lnum" on; }
+.badge { display: inline-flex; align-items: center; padding: 4px 10px; border-radius: 999px; font-size: 11px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; border: 1px solid var(--glass-border-strong); background: rgba(150,150,150,0.1); margin-bottom: 12px; }
+
+/* =========================================
+   CAMERA-STYLE TOP HUD
+   ========================================= */
+.cam-top-controls {
+  position: fixed; top: var(--safe-top); left: 0; right: 0; z-index: 80;
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 12px 24px; pointer-events: none;
+}
+.cam-top-group { display: flex; gap: 12px; pointer-events: auto; }
+.cam-icon-btn {
+  appearance: none; border: 0; background: rgba(20,20,25,0.6); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+  color: #fff; width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; cursor: pointer;
+  box-shadow: inset 0 1px 1px rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.05); transition: 0.2s;
+}
+.cam-icon-btn.yellow { color: var(--cam-yellow); }
+html[data-time="day"] .cam-icon-btn { background: rgba(255,255,255,0.8); color: #000; box-shadow: 0 4px 10px rgba(0,0,0,0.1); border: 1px solid rgba(0,0,0,0.05); }
+
+/* =========================================
+   SLIDER "EV" (Exposure / Time of Day)
+   ========================================= */
+.ev-slider-container {
+  position: fixed; right: 16px; top: 50%; transform: translateY(-50%); z-index: 85;
+  height: 250px; width: 40px; display: flex; flex-direction: column; align-items: center; justify-content: center; touch-action: none;
+}
+@media (max-width: 768px) { .ev-slider-container { right: 4px; height: 200px; } }
+
+.ev-icon { font-size: 12px; color: var(--cam-yellow); margin-bottom: 8px; font-weight: bold; font-family: var(--mono); transition: color 1s;}
+html[data-time="day"] .ev-icon { color: #000; }
+
+.ev-track { width: 1px; height: 100%; background: rgba(255,255,255,0.2); position: relative; display: flex; justify-content: center; }
+html[data-time="day"] .ev-track { background: rgba(0,0,0,0.2); }
+
+.ev-thumb-wrapper { position: absolute; width: 40px; height: 2px; top: 0%; cursor: grab; display: flex; align-items: center; justify-content: center; }
+.ev-thumb-wrapper:active { cursor: grabbing; }
+.ev-thumb-line { width: 20px; height: 2px; background: var(--cam-yellow); box-shadow: 0 0 8px var(--cam-yellow); }
+html[data-time="day"] .ev-thumb-line { background: #000; box-shadow: none; }
+
+.ev-marks { position: absolute; height: 100%; width: 10px; right: 10px; display: flex; flex-direction: column; justify-content: space-between; pointer-events: none;}
+.ev-mark { width: 4px; height: 1px; background: rgba(255,255,255,0.3); }
+html[data-time="day"] .ev-mark { background: rgba(0,0,0,0.3); }
+
+/* =========================================
+   CAMERA NAV DIAL (BOTTOM)
+   ========================================= */
+.camera-nav-wrapper {
+  position: fixed; bottom: calc(16px + var(--safe-bottom)); left: 50%; transform: translateX(-50%); z-index: 90;
+  padding: 2px; border-radius: 999px; background: transparent; transition: background 0.3s ease, box-shadow 0.3s ease;
+}
+.camera-nav-wrapper.siri-glow {
+  background: conic-gradient(from 0deg, #ec4899, #8b5cf6, #3b82f6, #ec4899);
+  animation: siriSpin 2s linear infinite; box-shadow: 0 0 20px rgba(139, 92, 246, 0.4);
+}
+@keyframes siriSpin { 100% { transform: translateX(-50%) rotate(360deg); } }
+.camera-nav-wrapper.siri-glow .camera-nav-inner { animation: siriCounterSpin 2s linear infinite; }
+@keyframes siriCounterSpin { 100% { transform: rotate(-360deg); } }
+
+.camera-nav-inner {
+  width: min(90vw, 520px); height: 50px;
+  background: rgba(10, 10, 12, 0.75); backdrop-filter: blur(40px); -webkit-backdrop-filter: blur(40px);
+  border: 1px solid rgba(255,255,255,0.15); border-radius: 999px; overflow: hidden; position: relative;
+}
+html[data-time="day"] .camera-nav-inner { background: rgba(255,255,255,0.8); border-color: rgba(0,0,0,0.1); }
+
+.camera-nav-inner::before {
+  content: ''; position: absolute; top: 6px; bottom: 6px; left: 50%; width: 50px; transform: translateX(-50%);
+  background: rgba(255,255,255,0.05); border-radius: 999px; z-index: 0; pointer-events: none;
+}
+html[data-time="day"] .camera-nav-inner::before { background: rgba(0,0,0,0.05); }
+
+.camera-nav-scroll {
+  display: flex; align-items: center; height: 100%; overflow-x: auto;
+  scroll-snap-type: x mandatory; scrollbar-width: none; 
+  padding: 0 calc(50% - 35px); position: relative; z-index: 1; -webkit-overflow-scrolling: touch;
+}
+.camera-nav-scroll::-webkit-scrollbar { display: none; }
+
+.cam-btn {
+  scroll-snap-align: center; flex: 0 0 auto; appearance: none; border: none; background: transparent;
+  color: rgba(255,255,255,0.5); font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;
+  padding: 0 16px; height: 100%; cursor: pointer; transition: color 0.2s, transform 0.2s;
+}
+html[data-time="day"] .cam-btn { color: rgba(0,0,0,0.4); }
+.cam-btn.active { color: var(--cam-yellow); text-shadow: 0 0 10px rgba(255, 204, 0, 0.4); }
+html[data-time="day"] .cam-btn.active { color: #000; text-shadow: none; font-weight: 700;}
+
+/* =========================================
+   LAYOUT & SECTIONS
+   ========================================= */
+.app-content { max-width: var(--content); margin: 0 auto; padding: calc(60px + var(--safe-top)) 24px calc(140px + var(--safe-bottom)); display: flex; flex-direction: column; gap: 120px; }
+@media (max-width: 768px) { .app-content { padding-left: 16px; padding-right: 32px; gap: 80px;} }
+
+section { scroll-margin-top: calc(80px + var(--safe-top)); }
+
+.section-header { margin-bottom: 40px; }
+.section-header h2 { font-size: clamp(32px, 5vw, 54px); font-weight: 600; letter-spacing: -0.04em; margin: 0 0 16px; line-height: 1.1; }
+.section-header p { font-size: clamp(16px, 2vw, 20px); color: var(--muted); max-width: 700px; line-height: 1.6; margin: 0; }
+
+.widget-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px; }
+.w-card { padding: 32px; border-radius: var(--radius-lg); display: flex; flex-direction: column; }
+.w-card-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; border-bottom: 1px solid var(--glass-border); padding-bottom: 16px;}
+.w-num { font-size: 16px; font-weight: 700; color: var(--accent); font-family: var(--mono); }
+.w-title { font-size: 20px; font-weight: 600; margin: 8px 0; color: var(--text); letter-spacing: -0.02em;}
+.w-desc { font-size: 14px; color: var(--muted); line-height: 1.5; margin-bottom: 24px; flex-grow: 1;}
+
+.w-visual { background: rgba(0,0,0,0.2); border-radius: var(--radius-md); padding: 16px; border: 1px solid var(--glass-border); margin-top: auto;}
+html[data-time="day"] .w-visual { background: rgba(255,255,255,0.4); }
+.w-visual h4 { font-size: 11px; text-transform: uppercase; color: var(--muted); margin: 0 0 8px; letter-spacing: 0.05em;}
+.w-visual p { font-size: 13px; margin: 0; line-height: 1.4;}
+.w-visual ul { margin: 8px 0 0 18px; padding: 0; }
+.w-visual li { font-size: 13px; color: var(--muted); line-height: 1.45; margin: 4px 0; }
+
+blockquote.premium { padding: 32px; border-left: 4px solid var(--accent); background: var(--glass-bg); border-radius: 0 var(--radius-md) var(--radius-md) 0; font-size: 20px; font-style: italic; margin: 0; box-shadow: var(--glass-shadow); border-top: 1px solid var(--glass-border); border-right: 1px solid var(--glass-border); border-bottom: 1px solid var(--glass-border);}
+
+.roadmap-table { width: 100%; border-collapse: collapse; margin-top: 24px; }
+.roadmap-table th, .roadmap-table td { padding: 20px; text-align: left; border-bottom: 1px solid var(--glass-border); vertical-align: top; }
+.roadmap-table th { font-weight: 600; color: var(--muted); font-size: 13px; text-transform: uppercase; letter-spacing: 0.05em;}
+.roadmap-table td { font-size: 15px; line-height: 1.5; }
+.roadmap-table strong { color: var(--text); font-weight: 600; }
+@media (max-width: 768px) {
+  .roadmap-table th, .roadmap-table td { padding: 16px 12px; display: block; width: 100%;}
+  .roadmap-table tr { border-bottom: 2px solid var(--glass-border-strong); display: block; padding-bottom: 16px; margin-bottom: 16px;}
+  .roadmap-table th { display: none; }
+}
+
+.mockup-toggle { display: inline-flex; align-items: center; gap: 8px; background: rgba(0,0,0,0.5); padding: 8px 16px; border-radius: 999px; border: 1px solid var(--glass-border); font-family: var(--mono); font-size: 12px;}
+.mockup-toggle .dot { width: 8px; height: 8px; background: #27c93f; border-radius: 50%; box-shadow: 0 0 8px #27c93f;}
+
+.callout-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 24px; }
+.small-note { font-size: 13px; color: var(--muted); line-height: 1.45; }
+ul.tidy { margin: 0; padding-left: 18px; }
+ul.tidy li { margin: 8px 0; color: var(--muted); }
+
+#toast {
+  position: fixed; left: 50%; transform: translateX(-50%);
+  bottom: calc(84px + var(--safe-bottom)); z-index: 120;
+  padding: 10px 18px; border-radius: 999px;
+  background: rgba(18,18,22,0.88); color: #fff;
+  border: 1px solid rgba(255,255,255,0.1);
+  box-shadow: 0 18px 40px rgba(0,0,0,0.35);
+  opacity: 0; pointer-events: none; transition: opacity .2s ease, transform .2s ease;
+}
+#toast.show { opacity: 1; transform: translateX(-50%) translateY(-4px); }
+</style>
+</head>
+<body>
+
+<div class="cam-top-controls">
+  <div class="cam-top-group">
+    <button class="cam-icon-btn" aria-label="System Info" onclick="toast('AIOS V9 Core Active')">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"></circle><path d="M12 16v-4"></path><path d="M12 8h.01"></path></svg>
+    </button>
+  </div>
+  <div class="cam-top-group">
+    <button class="cam-icon-btn yellow" aria-label="Status">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 2v20"></path><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+    </button>
+  </div>
+  <div class="cam-top-group">
+    <button class="cam-icon-btn" aria-label="Sync" onclick="toast('Sincronizando com repositório...')">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"></path><path d="M21 3v5h-5"></path></svg>
+    </button>
+  </div>
+</div>
+
+<div class="ev-slider-container" id="evSlider">
+  <div class="ev-icon" id="evIcon">0.0</div>
+  <div class="ev-track">
+    <div class="ev-marks">
+      <div class="ev-mark"></div><div class="ev-mark"></div><div class="ev-mark"></div><div class="ev-mark"></div><div class="ev-mark"></div>
+    </div>
+    <div class="ev-thumb-wrapper" id="evThumb">
+      <div class="ev-thumb-line"></div>
+    </div>
+  </div>
+</div>
+
+<main class="app-content">
+
+  <section id="intro">
+    <div class="badge">Estratégia & Documentação</div>
+    <h1 style="font-size: clamp(40px, 8vw, 72px); font-weight: 600; line-height: 1.05; letter-spacing: -0.04em; margin: 0 0 24px;">
+      AIOS — V9 <br>
+      <span class="text-gradient">Guia Estratégico Curado</span>
+    </h1>
+    <p style="font-size: clamp(18px, 3vw, 24px); color: var(--muted); max-width: 800px; line-height: 1.5; margin: 0 0 24px;">
+      Guia Estratégico Curado de Evolução, Hipóteses, Governança e Disciplina Arquitetural.
+    </p>
+
+    <div class="glass w-card">
+      <h3 class="w-title">Natureza do documento</h3>
+      <p class="w-desc" style="font-size: 16px;">Este documento <strong>não é backlog</strong>, <strong>não é roadmap fechado</strong> e <strong>não autoriza implementação automática</strong>. Ele consolida:</p>
+      <ol class="tidy" style="margin-left: 18px; color: var(--muted);">
+        <li>A evolução curada do V5/V6/V7/V8</li>
+        <li>O brainstorming já refinado e filtrado</li>
+        <li>As contribuições externas que realmente enriqueceram a visão do AIOS</li>
+        <li>Um protocolo de leitura para que ideias promissoras não virem ruído operacional</li>
+        <li>Um filtro explícito para conversa com outras IAs sem perda de trilho</li>
+      </ol>
+      <blockquote class="premium" style="margin-top: 24px; border-radius: var(--radius-md);">
+        "Seu papel é servir como guia estratégico, memória curada, filtro epistemológico e mapa de hipóteses por aderência ao estado real do AIOS. O AIOS não deve ser arrastado por ideias brilhantes fora de hora."
+      </blockquote>
+    </div>
+  </section>
+
+  <section id="prefacio">
+    <div class="section-header">
+      <div class="badge">0. Prefácio</div>
+      <h2>Por que este documento existe</h2>
+      <p>O AIOS já ultrapassou o estágio em que o maior risco era “faltar visão”. A visão existe. A ambição existe. O circuito mínimo real já existe.</p>
+    </div>
+
+    <div class="callout-grid">
+      <div class="glass w-card">
+        <h3 class="w-title">O Risco Atual</h3>
+        <ul class="tidy">
+          <li>importar sofisticação antes de endurecer o que já foi provado</li>
+          <li>confundir hipótese com decisão</li>
+          <li>transformar arquitetura futura em peso morto sobre o presente</li>
+          <li>usar documento estratégico como substituto de engenharia real</li>
+          <li>aceitar contribuições externas sem filtro de aderência</li>
+          <li>produzir documentação em ritmo maior que a evidência</li>
+        </ul>
+      </div>
+      <div class="glass w-card">
+        <h3 class="w-title">O Papel do Guia</h3>
+        <p class="w-desc">Este guia foi escrito para operar como:</p>
+        <ul class="tidy">
+          <li>constituição de leitura</li>
+          <li>sistema de triagem de ideias</li>
+          <li>reserva estratégica de futuro</li>
+          <li>barreira contra hype elegante</li>
+          <li>mecanismo de autocontenção conceitual</li>
+          <li>protocolo de conversa entre humano, IA e repositório</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section id="clausulas">
+    <div class="section-header">
+      <div class="badge">1. Cláusula de interpretação</div>
+      <h2>O Filtro Definitivo</h2>
+      <p>A pergunta inicial nunca deve ser "isso é brilhante?", mas sim "isso é aderente, útil, testável e compatível com o estado real do AIOS?".</p>
+    </div>
+
+    <div class="widget-grid">
+      <div class="glass w-card">
+        <div class="w-num">1.1</div>
+        <h3 class="w-title">O que este documento é</h3>
+        <ul class="tidy">
+          <li>constituição de leitura do estágio atual</li>
+          <li>guia estratégico de hipóteses arquiteturais</li>
+          <li>registro curado de ideias promissoras</li>
+          <li>filtro contra distorções e importações ruins</li>
+          <li>reservatório de futuro sem poluição do presente</li>
+          <li>defesa contra overengineering por entusiasmo</li>
+        </ul>
+      </div>
+
+      <div class="glass w-card">
+        <div class="w-num">1.2</div>
+        <h3 class="w-title">O que este documento não é</h3>
+        <ul class="tidy">
+          <li>backlog operacional ou promessa de implementação</li>
+          <li>autorização automática para mudar o runtime</li>
+          <li>justificativa para reabrir arquitetura estabilizada</li>
+          <li>substituto de código, testes, benchmark ou ledger</li>
+          <li>licença para importar ideias externas só porque soam bem</li>
+        </ul>
+      </div>
+
+      <div class="glass w-card">
+        <div class="w-num">1.3</div>
+        <h3 class="w-title">Regra de Ouro de Uso</h3>
+        <p class="w-desc">Toda ideia nova deve ser interpretada primeiro como:</p>
+        <ul class="tidy">
+          <li>hipótese fortemente aderente ao estágio atual</li>
+          <li>hipótese promissora para fase futura</li>
+          <li>hipótese em observação</li>
+          <li>hipótese distorcida ou inadequada ao AIOS real</li>
+        </ul>
+      </div>
+
+      <div class="glass w-card">
+        <div class="w-num">1.4</div>
+        <h3 class="w-title">Cláusula anti-burocracia</h3>
+        <p class="w-desc">Este guia não deve ser usado para sufocar brainstorming legítimo. Seu papel não é matar ideias cedo demais.</p>
+        <div class="w-visual">
+          <h4>Fórmula curta</h4>
+          <p>Flexibilidade para pensar; rigor para promover; disciplina para implementar.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="canonico">
+    <div class="section-header">
+      <div class="badge">2. Estado canônico</div>
+      <h2>O Estágio Atual do AIOS</h2>
+      <p>O AIOS já provou, por código e artefatos reais, uma sequência rara e correta de construção.</p>
+    </div>
+
+    <div class="callout-grid" style="margin-bottom: 24px;">
+      <div class="glass w-card">
+        <h3 class="w-title">Fundação & Boundary</h3>
+        <ul class="tidy">
+          <li>contratos centrais e FSM determinística</li>
+          <li>ledger mínimo com integridade e rollback estrutural</li>
+          <li><code>ISandbox</code> como abstração canônica e adaptador E2B</li>
+          <li>política efetiva de Default Deny</li>
+          <li>ciclo create -> execute -> inspect -> destroy</li>
+        </ul>
+      </div>
+      <div class="glass w-card">
+        <h3 class="w-title">Lote 2 Provado</h3>
+        <ul class="tidy">
+          <li>integração real com provider externo</li>
+          <li>chamada LLM fora da sandbox</li>
+          <li>execução de comando dentro da sandbox</li>
+          <li>smoke test determinístico e homologação E2E</li>
+        </ul>
+      </div>
+      <div class="glass w-card">
+        <h3 class="w-title">Leitura honesta</h3>
+        <p class="w-desc">O AIOS não está em fase de fantasia nem de arquitetura cognitiva rica e memória governada. É um sistema com circuito mínimo provado, pronto para endurecimento disciplinado.</p>
+      </div>
+    </div>
+
+    <div class="glass w-card">
+      <h3 class="w-title">Leitura de Risco & Consequência</h3>
+      <p class="w-desc">A próxima evolução útil do AIOS não é “mais inteligência”. É <strong>mais critério, mais contenção e mais validação ao redor da inteligência já conectada</strong>.</p>
+      <div class="w-visual">
+        <h4>Riscos do Momento</h4>
+        <ul>
+          <li><strong>Risco A (Congelamento):</strong> O sistema já funciona, então nada é endurecido por medo de tocar.</li>
+          <li><strong>Risco B (Fantasia Adiantada):</strong> O time tenta saltar cedo demais para multiagentes, memória e autoevolução sem dor real.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section id="invariantes">
+    <div class="section-header">
+      <div class="badge">3. Invariantes Globais</div>
+      <h2>Pilares Preservados</h2>
+      <p>Estes invariantes permanecem válidos e devem sobreviver a qualquer leitura futura deste guia.</p>
+    </div>
+
+    <div class="callout-grid">
+      <div class="glass w-card"><h3 class="w-title">3.1 Evidência > inferência</h3><p class="w-desc">Prova observável continua acima de raciocínio plausível.</p></div>
+      <div class="glass w-card"><h3 class="w-title">3.2 Fail-closed</h3><p class="w-desc">Na ambiguidade relevante, preferir recusar ou degradar a seguir por impulso.</p></div>
+      <div class="glass w-card"><h3 class="w-title">3.3 Default Deny</h3><p class="w-desc">A inteligência entra fora; a execução acontece dentro da sandbox contida.</p></div>
+      <div class="glass w-card"><h3 class="w-title">3.4 Disciplina fundacional</h3><p class="w-desc">Memória, subagentes e autoevolução são todos subordinados à fundação já provada.</p></div>
+      <div class="glass w-card"><h3 class="w-title">3.5 Ideia fora de hora</h3><p class="w-desc">Ideias brilhantes podem ser preservadas, mas não ganham prioridade automática.</p></div>
+      <div class="glass w-card"><h3 class="w-title">3.6 Sem humano no loop</h3><p class="w-desc">Nenhuma autoevolução elimina a arbitragem humana sobre o que governa o sistema.</p></div>
+      <div class="glass w-card"><h3 class="w-title">3.7 O doc não governa só</h3><p class="w-desc">Nenhum texto substitui o repositório, ledger, evidência e teste executado.</p></div>
+      <div class="glass w-card"><h3 class="w-title">3.8 Sem mentir maturidade</h3><p class="w-desc">Qualquer camada nova deve nascer como hipótese, experimento e endurecimento.</p></div>
+    </div>
+  </section>
+
+  <section id="evolucao">
+    <div class="section-header">
+      <div class="badge">4. Evolução Curada</div>
+      <h2>Evolução do V5/V6/V7/V8 e Arqueologia</h2>
+      <p>Esta seção registra apenas as evoluções que sobreviveram ao filtro de aderência ao AIOS real.</p>
+    </div>
+
+    <div class="widget-grid">
+      <div class="glass w-card">
+        <div class="w-card-top"><div class="w-num">4.1</div></div>
+        <h3 class="w-title">Sentinela de Integridade</h3>
+        <p class="w-desc">Fiscal de integridade, não orquestrador paralelo. Observa, detecta anomalia, classifica e registra evidência sem hipertrofia. Deve nascer leve e calibrável.</p>
+      </div>
+
+      <div class="glass w-card">
+        <div class="w-card-top"><div class="w-num">4.2</div></div>
+        <h3 class="w-title">Shadow Mode</h3>
+        <p class="w-desc">Resolve a tensão de ganhar rigor sem congelar o sistema. Observa, acusa e registra antes de punir ou bloquear regras e prompts.</p>
+      </div>
+
+      <div class="glass w-card">
+        <div class="w-card-top"><div class="w-num">4.3</div></div>
+        <h3 class="w-title">Separação de Contexto</h3>
+        <p class="w-desc">Ledger bruto não é prompt. O histórico de auditoria não deve ser despejado indiscriminadamente no contexto do LLM. Usar resumos determinísticos.</p>
+      </div>
+
+      <div class="glass w-card">
+        <div class="w-card-top"><div class="w-num">4.4</div></div>
+        <h3 class="w-title">Degradação Segura</h3>
+        <p class="w-desc">Menos terapia com o LLM; mais disjuntor do runtime. Retry budget curto, cooldown e fallback determinístico contra o "loop da morte".</p>
+      </div>
+
+      <div class="glass w-card">
+        <div class="w-card-top"><div class="w-num">4.5 & 4.6</div></div>
+        <h3 class="w-title">Human Gate & Failure Signature</h3>
+        <p class="w-desc">Sem autoevolução sem humano no loop. E erros não devem ser apenas "deu erro", mas registrar qual regra falhou, etapa e severidade.</p>
+      </div>
+
+      <div class="glass w-card">
+        <div class="w-card-top"><div class="w-num">4.7 & 4.8</div></div>
+        <h3 class="w-title">Arqueologia Curada</h3>
+        <p class="w-desc">O próximo salto não é ornamentar; é unificar. Artefatos críticos exigem ritual forte. A confiança deve ser materializada no artefato, não na narrativa do processo.</p>
+        <div class="w-visual">
+          <h4>Avisos Importantes</h4>
+          <ul>
+            <li>Pipeline maduro começa na ingestão.</li>
+            <li>Semântica maior que enforcement é dívida de confiança.</li>
+            <li>Sistemas parecem mais maduros quando a superfície cresce mais rápido que o enforcement.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="hipoteses">
+    <div class="section-header">
+      <div class="badge">5. Hipóteses</div>
+      <h2>Fortemente Aderentes ao Estágio Atual</h2>
+      <p>Estas hipóteses aumentam a robustez sem ruptura, mas só amadurecem com dados reais e testes claros. Não são um convite à burocracia excessiva.</p>
+    </div>
+
+    <div class="widget-grid">
+      <div class="glass w-card">
+        <div class="w-card-top"><div class="w-num">5.1</div></div>
+        <h3 class="w-title">Intent validation antes do LLM</h3>
+        <div class="w-visual">
+          <h4>Valor esperado</h4><p>Reduzir lixo cedo; não mandar qualquer coisa ao provider.</p>
+          <h4>Condição & Prova</h4><p>Lote 2 estável. Prova: queda de entradas inválidas no fluxo.</p>
+          <h4>Signature & Risco</h4><p>Risco de virar burocracia rígida. Signature: intent bloqueada com padrão nomeado.</p>
+        </div>
+      </div>
+
+      <div class="glass w-card">
+        <div class="w-card-top"><div class="w-num">5.2</div></div>
+        <h3 class="w-title">Policy guard antes da execução</h3>
+        <div class="w-visual">
+          <h4>Valor esperado</h4><p>Reforçar coerência inteligência-boundary antes de ir cru à sandbox.</p>
+          <h4>Condição & Prova</h4><p>Regras pequenas e auditáveis (Shadow Mode). Prova: warnings úteis no ledger.</p>
+          <h4>Signature & Risco</h4><p>Risco de policy teatral. Signature: regra acusada nominalmente.</p>
+        </div>
+      </div>
+
+      <div class="glass w-card">
+        <div class="w-card-top"><div class="w-num">5.3</div></div>
+        <h3 class="w-title">Schema validation semântico</h3>
+        <div class="w-visual">
+          <h4>Valor esperado</h4><p>Validar conteúdo, risco e coerência, não apenas a forma.</p>
+          <h4>Condição & Prova</h4><p>Edge cases no uso real. Prova: rejeição de comandos incoerentes.</p>
+          <h4>Signature & Risco</h4><p>Risco de juiz absoluto cedo demais. Signature: tipo de violação claro.</p>
+        </div>
+      </div>
+
+      <div class="glass w-card">
+        <div class="w-card-top"><div class="w-num">5.4</div></div>
+        <h3 class="w-title">Evidence checker universal</h3>
+        <div class="w-visual">
+          <h4>Valor esperado</h4><p>Linguagem comum para evidência ausente, indireta ou forte.</p>
+          <h4>Condição & Prova</h4><p>Runner coleta artefatos verificáveis. Prova: distinguir sucesso provado de sucesso cego.</p>
+          <h4>Signature & Risco</h4><p>Risco de penalizar fluxos em maturação. Signature: Nível de evidência legível.</p>
+        </div>
+      </div>
+
+      <div class="glass w-card">
+        <div class="w-card-top"><div class="w-num">5.5</div></div>
+        <h3 class="w-title">Two-phase logging</h3>
+        <div class="w-visual">
+          <h4>Valor esperado</h4><p>Registrar intenção antes, desfecho depois. Detecta fluxos órfãos.</p>
+          <h4>Condição & Prova</h4><p>Correlação clara via IDs. Prova: reduz execução mal registrada.</p>
+          <h4>Signature & Risco</h4><p>Risco de eventos sem consumo. Signature: MISSING_OUTCOME, etc.</p>
+        </div>
+      </div>
+
+      <div class="glass w-card">
+        <div class="w-card-top"><div class="w-num">5.6</div></div>
+        <h3 class="w-title">Sentinela v1 em shadow</h3>
+        <div class="w-visual">
+          <h4>Valor esperado</h4><p>Observar anomalias sem travar o sistema cedo; construir repertório.</p>
+          <h4>Condição & Prova</h4><p>Ledger estável e compromisso leve. Prova: falsos positivos e warnings úteis.</p>
+          <h4>Signature & Risco</h4><p>Risco de nascer hipertrofiado. Signature: severity e candidato a bloqueio.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="brainstorm">
+    <div class="section-header">
+      <div class="badge">6. Brainstorm Curado</div>
+      <h2>Visão de Médio e Longo Prazo</h2>
+      <p>Ideias como reserva estratégica, já curadas. Nenhuma recebe promoção automática ou bypass arquitetural.</p>
+    </div>
+
+    <div class="widget-grid">
+      <div class="glass w-card">
+        <div class="w-card-top"><div class="w-num">6.1 & 6.2</div></div>
+        <h3 class="w-title">Agentes Cognitivos & Subagentes Rígidos</h3>
+        <p class="w-desc">Papéis como Executor, Curador, Cronista. Subagentes funcionam como operadores normativos. <strong>Risco:</strong> Teatralização e microcomponentes antes da dor real. Agente interpreta; subagente aplica.</p>
+      </div>
+
+      <div class="glass w-card">
+        <div class="w-card-top"><div class="w-num">6.3 & 6.4</div></div>
+        <h3 class="w-title">Solicitação Dinâmica & Trainee</h3>
+        <p class="w-desc">Pedir agentes por necessidade declarada e circular "rotators" para aprender padrões. <strong>Risco:</strong> Explosão combinatória, instanciamento caótico e agente bonito sem função.</p>
+      </div>
+
+      <div class="glass w-card">
+        <div class="w-card-top"><div class="w-num">6.5 & 6.6</div></div>
+        <h3 class="w-title">Memória & Forge Memory</h3>
+        <p class="w-desc">O AIOS fica forte sabendo o que descartar. Forge Memory como domínio, não deus-objeto. <strong>Risco:</strong> Construir aterro cognitivo e burocratizar antes de haver tráfego real.</p>
+      </div>
+
+      <div class="glass w-card">
+        <div class="w-card-top"><div class="w-num">6.7 & 6.8</div></div>
+        <h3 class="w-title">Alma (Estilo) & Multi-LLM</h3>
+        <p class="w-desc">Alma é estilo de apresentação, nunca critério normativo. Multi-LLM focado em roteamento por risco e custo. <strong>Risco:</strong> Importar subjetividade no core e desfile de modelos sem tese.</p>
+      </div>
+
+      <div class="glass w-card">
+        <div class="w-card-top"><div class="w-num">6.9 & 6.10</div></div>
+        <h3 class="w-title">Cronista & Rituais Futuros</h3>
+        <p class="w-desc">Consolidado determinístico entre ledger e prompting. Governança forte de artefatos canônicos no futuro. <strong>Risco:</strong> Institucionalização prematura, decomposição ornamental e verbosidade.</p>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<div class="camera-nav-wrapper" id="cameraNavWrapper">
+  <div class="camera-nav-inner">
+    <div class="camera-nav-scroll" id="cameraNavScroll">
+      <button class="cam-btn active" data-target="intro">INÍCIO</button>
+      <button class="cam-btn" data-target="prefacio">PREFÁCIO</button>
+      <button class="cam-btn" data-target="clausulas">CLÁUSULAS</button>
+      <button class="cam-btn" data-target="canonico">CANÔNICO</button>
+      <button class="cam-btn" data-target="invariantes">INVARIANTES</button>
+      <button class="cam-btn" data-target="evolucao">EVOLUÇÃO</button>
+      <button class="cam-btn" data-target="hipoteses">HIPÓTESES</button>
+      <button class="cam-btn" data-target="brainstorm">BRAINSTORM</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+const toastEl = document.getElementById('toast');
+function toast(msg){
+  toastEl.textContent=msg; toastEl.classList.add('show');
+  clearTimeout(window.__toast); window.__toast=setTimeout(()=>toastEl.classList.remove('show'),1800);
+}
+
+function triggerHaptic(duration = 15) {
+  if (navigator.vibrate) navigator.vibrate(duration);
+}
+
+const evSlider = document.getElementById('evSlider');
+const evThumb = document.getElementById('evThumb');
+const evIcon = document.getElementById('evIcon');
+let isDraggingEV = false;
+let startY = 0;
+let initialTop = 0;
+
+const timesOfDay = [
+  { name: 'night', label: '-2.0', color: '#050507' },
+  { name: 'dawn', label: '-1.0', color: '#140d1a' },
+  { name: 'day', label: '0.0', color: '#f0f4f8' },
+  { name: 'afternoon', label: '+1.0', color: '#1a1410' },
+  { name: 'dusk', label: '+2.0', color: '#0f172a' }
+];
+
+function updateThemeByPercentage(percent) {
+  let index = Math.floor((percent / 100) * timesOfDay.length);
+  if (index >= timesOfDay.length) index = timesOfDay.length - 1;
+  if (index < 0) index = 0;
+
+  const theme = timesOfDay[index];
+
+  if(document.documentElement.getAttribute('data-time') !== theme.name) {
+    document.documentElement.setAttribute('data-time', theme.name);
+    document.getElementById('metaThemeColor').setAttribute('content', theme.color);
+    evIcon.textContent = theme.label;
+    triggerHaptic(10);
+  }
+}
+
+evThumb.addEventListener('pointerdown', (e) => {
+  isDraggingEV = true;
+  startY = e.clientY;
+  initialTop = parseFloat(evThumb.style.top) || 0;
+  evThumb.setPointerCapture(e.pointerId);
+});
+
+evThumb.addEventListener('pointermove', (e) => {
+  if (!isDraggingEV) return;
+  const trackHeight = evSlider.clientHeight;
+  const deltaY = e.clientY - startY;
+  const deltaPercent = (deltaY / trackHeight) * 100;
+
+  let newTop = initialTop + deltaPercent;
+  if (newTop < 0) newTop = 0;
+  if (newTop > 100) newTop = 100;
+
+  evThumb.style.top = newTop + '%';
+  updateThemeByPercentage(newTop);
+});
+
+evThumb.addEventListener('pointerup', (e) => {
+  isDraggingEV = false;
+  evThumb.releasePointerCapture(e.pointerId);
+});
+
+evSlider.addEventListener('click', (e) => {
+  if(e.target === evThumb || evThumb.contains(e.target)) return;
+  const rect = evSlider.getBoundingClientRect();
+  const y = e.clientY - rect.top;
+  let percent = (y / rect.height) * 100;
+  if(percent < 0) percent = 0; if(percent > 100) percent = 100;
+  evThumb.style.top = percent + '%';
+  updateThemeByPercentage(percent);
+});
+
+const camScroll = document.getElementById('cameraNavScroll');
+const camBtns = document.querySelectorAll('.cam-btn');
+const camWrapper = document.getElementById('cameraNavWrapper');
+const sections = Array.from(camBtns).map(btn => document.getElementById(btn.dataset.target)).filter(Boolean);
+
+let siriTimer;
+let isScrollingByClick = false;
+
+function triggerSiriGlow() {
+  camWrapper.classList.add('siri-glow');
+  clearTimeout(siriTimer);
+  siriTimer = setTimeout(() => { camWrapper.classList.remove('siri-glow'); }, 1500);
+}
+
+camBtns.forEach(btn => {
+  btn.addEventListener('click', () => {
+    isScrollingByClick = true;
+    const targetId = btn.dataset.target;
+    const targetSection = document.getElementById(targetId);
+    if(targetSection) {
+      targetSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+    camBtns.forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    btn.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+    triggerHaptic(20);
+    triggerSiriGlow();
+    setTimeout(() => { isScrollingByClick = false; }, 800);
+  });
+});
+
+camScroll.addEventListener('wheel', (e) => {
+  if (e.deltaY !== 0) {
+    e.preventDefault();
+    camScroll.scrollLeft += e.deltaY * 1.5;
+  }
+}, { passive: false });
+
+const observerOptions = {
+  root: null,
+  rootMargin: '-20% 0px -60% 0px',
+  threshold: 0
+};
+
+const observer = new IntersectionObserver((entries) => {
+  if (isScrollingByClick) return;
+
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      const id = entry.target.getAttribute('id');
+      const correspondingBtn = document.querySelector(`.cam-btn[data-target="${id}"]`);
+
+      if (correspondingBtn && !correspondingBtn.classList.contains('active')) {
+        camBtns.forEach(b => b.classList.remove('active'));
+        correspondingBtn.classList.add('active');
+        correspondingBtn.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+        triggerHaptic(10);
+      }
+    }
+  });
+}, observerOptions);
+
+sections.forEach(section => observer.observe(section));
+
+window.addEventListener('load', () => {
+  const activeCamBtn = document.querySelector('.cam-btn.active');
+  if(activeCamBtn) activeCamBtn.scrollIntoView({ behavior: 'auto', inline: 'center', block: 'nearest' });
+});
+</script>
+</body>
+</html>
