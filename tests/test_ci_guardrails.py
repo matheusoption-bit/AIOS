@@ -47,6 +47,41 @@ class CIGuardrailTests(unittest.TestCase):
             messages,
         )
 
+    def test_preserves_module_alias_after_nested_scope_rebind(self) -> None:
+        messages = self._collect_messages(
+            "src/example.py",
+            """
+            import os
+
+            danger = os.popen
+
+            def helper():
+                danger = print
+                return danger
+
+            helper()
+            danger("id")
+            """,
+        )
+        self.assertTrue(
+            any("aliased disallowed callable" in message and "os.popen" in message for message in messages),
+            messages,
+        )
+
+    def test_parameter_shadowing_does_not_inherit_outer_alias(self) -> None:
+        messages = self._collect_messages(
+            "src/example.py",
+            """
+            import os
+
+            danger = os.popen
+
+            def helper(danger):
+                danger("id")
+            """,
+        )
+        self.assertFalse(any("aliased disallowed callable" in message for message in messages), messages)
+
     def test_does_not_flag_alias_of_homonymous_non_admin_method(self) -> None:
         messages = self._collect_messages(
             "src/example.py",
