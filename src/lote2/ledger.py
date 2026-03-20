@@ -13,6 +13,7 @@ import hashlib
 import hmac
 import os
 import uuid
+import warnings
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
@@ -122,7 +123,17 @@ class L2Ledger:
         self._first_event_written = False
         configured_hmac = hmac_key or os.getenv(LEDGER_HMAC_ENV_VAR)
         self._hmac_key = (configured_hmac or DEV_FALLBACK_HMAC_KEY).encode("utf-8")
+        self.using_dev_fallback_hmac = not configured_hmac
         self.integrity_mode = "HMAC_SHA256" if configured_hmac else "DEV_FALLBACK_HMAC_SHA256"
+
+        if self.using_dev_fallback_hmac:
+            warnings.warn(
+                f"{LEDGER_HMAC_ENV_VAR} não configurada; ledger operando em "
+                "DEV_FALLBACK_HMAC_SHA256 com chave fallback de compatibilidade. "
+                "Configure uma chave dedicada por ambiente para integridade forte.",
+                RuntimeWarning,
+                stacklevel=2,
+            )
 
     def _compute_hash(self, event: dict) -> str:
         """

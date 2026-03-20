@@ -2,6 +2,7 @@ import os
 import tempfile
 import sys
 import unittest
+import warnings
 from pathlib import Path
 
 
@@ -46,6 +47,38 @@ class ValidateLedgerTests(unittest.TestCase):
                 if previous_key is None:
                     os.environ.pop("AIOS_LEDGER_HMAC_KEY", None)
                 else:
+                    os.environ["AIOS_LEDGER_HMAC_KEY"] = previous_key
+
+    def test_accepts_dev_fallback_hmac_and_warns_clearly(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            ledger_path = Path(tmpdir) / "ledger.jsonl"
+            previous_key = os.environ.pop("AIOS_LEDGER_HMAC_KEY", None)
+            try:
+                with warnings.catch_warnings(record=True) as caught:
+                    warnings.simplefilter("always")
+                    ledger = L2Ledger(ledger_path=ledger_path)
+
+                self.assertEqual(ledger.integrity_mode, "DEV_FALLBACK_HMAC_SHA256")
+                self.assertTrue(ledger.using_dev_fallback_hmac)
+                self.assertTrue(
+                    any("DEV_FALLBACK_HMAC_SHA256" in str(warning.message) for warning in caught),
+                    caught,
+                )
+
+                ledger.emit("LLM_CALL", "PROVIDER", "OK", {
+                    "instruction": "fixture",
+                    "intent_phase": "OPEN",
+                    "intent_kind": "WRITE_FILE_TEXT",
+                })
+                ledger.emit_run_finished(
+                    final_outcome="SUCCESS",
+                    evidence_level="STRONG_DETERMINISTIC_PROVED",
+                    summary="fixture ok",
+                    intent_phase="CLOSE",
+                )
+                self.assertTrue(validate_ledger(ledger_path))
+            finally:
+                if previous_key is not None:
                     os.environ["AIOS_LEDGER_HMAC_KEY"] = previous_key
 
 
