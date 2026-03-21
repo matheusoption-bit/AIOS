@@ -285,4 +285,16 @@ class E2BSecureWorkspaceSandbox(ISecureWorkspaceSandbox):
         return self._adapter.write_text_file(safe_dest_path, content)
 
     def read_text_file(self, path: str) -> ReadFileResult:
-        return self._adapter.read_text_file(path)
+        try:
+            from src.lote3.path_policy import PathViolationError, validate_safe_path
+
+            safe_path = validate_safe_path(path)
+        except PathViolationError as e:
+            return ReadFileResult(
+                success=False,
+                error=f"read_text_file bloqueado fora do workspace seguro: {e}",
+            )
+        except Exception as e:
+            return ReadFileResult(success=False, error=str(e))
+
+        return self._adapter.read_text_file(safe_path)

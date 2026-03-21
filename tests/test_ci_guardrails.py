@@ -32,6 +32,71 @@ class CIGuardrailTests(unittest.TestCase):
         )
         self.assertTrue(any("os.popen" in message for message in messages))
 
+    def test_detects_aliased_os_popen_call(self) -> None:
+        messages = self._collect_messages(
+            "src/example.py",
+            """
+            import os
+
+            danger = os.popen
+            danger("id")
+            """,
+        )
+        self.assertTrue(
+            any("aliased disallowed callable" in message and "os.popen" in message for message in messages),
+            messages,
+        )
+
+    def test_preserves_module_alias_after_nested_scope_rebind(self) -> None:
+        messages = self._collect_messages(
+            "src/example.py",
+            """
+            import os
+
+            danger = os.popen
+
+            def helper():
+                danger = print
+                return danger
+
+            helper()
+            danger("id")
+            """,
+        )
+        self.assertTrue(
+            any("aliased disallowed callable" in message and "os.popen" in message for message in messages),
+            messages,
+        )
+
+    def test_parameter_shadowing_does_not_inherit_outer_alias(self) -> None:
+        messages = self._collect_messages(
+            "src/example.py",
+            """
+            import os
+
+            danger = os.popen
+
+            def helper(danger):
+                danger("id")
+            """,
+        )
+        self.assertFalse(any("aliased disallowed callable" in message for message in messages), messages)
+
+    def test_does_not_flag_alias_of_homonymous_non_admin_method(self) -> None:
+        messages = self._collect_messages(
+            "src/example.py",
+            """
+            class Storage:
+                def copy_in(self):
+                    return "ok"
+
+            storage = Storage()
+            alias = storage.copy_in
+            alias()
+            """,
+        )
+        self.assertFalse(any("aliased disallowed callable" in message for message in messages), messages)
+
     def test_detects_exec_builtin(self) -> None:
         messages = self._collect_messages(
             "tests/example_test.py",

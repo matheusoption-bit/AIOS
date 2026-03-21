@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import os
 import re
+import warnings
 from dataclasses import dataclass
 from pathlib import PurePosixPath
 from typing import Literal
 
 
-POLICY_MODE = os.getenv("AIOS_L3_POLICY_MODE", "shadow").strip().lower() or "shadow"
+POLICY_MODE = os.getenv("AIOS_L3_POLICY_MODE", "shadow")
+_INVALID_MODE_WARNING_EMITTED = False
 ALLOWED_FILE_SUFFIXES = frozenset({".txt", ".md", ".json", ".yaml", ".yml", ".log"})
 SUSPICIOUS_CONTENT_PATTERNS = {
     "SUSPICIOUS_SHEBANG": re.compile(r"^#!", re.MULTILINE),
@@ -41,8 +43,21 @@ class PolicyGuardResult:
 
 
 def _normalize_mode(mode: str | None = None) -> str:
-    candidate = (mode or POLICY_MODE).strip().lower()
-    return candidate if candidate in {"shadow", "enforce"} else "shadow"
+    global _INVALID_MODE_WARNING_EMITTED
+
+    raw_mode = POLICY_MODE if mode is None else mode
+    candidate = (raw_mode or "").strip().lower()
+    if candidate in {"shadow", "enforce"}:
+        return candidate
+
+    if not _INVALID_MODE_WARNING_EMITTED:
+        warnings.warn(
+            f"policy mode inválido '{raw_mode}'; degradando para 'shadow'.",
+            RuntimeWarning,
+            stacklevel=2,
+        )
+        _INVALID_MODE_WARNING_EMITTED = True
+    return "shadow"
 
 
 def evaluate_write_intent(safe_path: str, content: str, mode: str | None = None) -> PolicyGuardResult:

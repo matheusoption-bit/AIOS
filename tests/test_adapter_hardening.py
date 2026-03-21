@@ -96,6 +96,29 @@ class AdapterHardeningTests(unittest.TestCase):
             b"PROVA L3",
         )
 
+    def test_secure_workspace_read_text_file_rejects_path_outside_safe_workspace(self) -> None:
+        adapter = E2BSandboxAdapter()
+        adapter._sandbox = FakeSandbox({"/tmp/escape.txt": "ESCAPE"})
+        secure_sandbox = E2BSecureWorkspaceSandbox(adapter=adapter)
+
+        result = secure_sandbox.read_text_file("/tmp/escape.txt")
+
+        self.assertFalse(result.success)
+        self.assertIn("workspace seguro", result.error or "")
+
+    def test_secure_workspace_read_text_file_accepts_safe_workspace_path(self) -> None:
+        adapter = E2BSandboxAdapter()
+        adapter._sandbox = FakeSandbox({
+            "/tmp/aios_workspace/outputs/proofs/input.txt": "PROVA L3",
+        })
+        secure_sandbox = E2BSecureWorkspaceSandbox(adapter=adapter)
+
+        result = secure_sandbox.read_text_file("proofs/input.txt")
+
+        self.assertTrue(result.success)
+        self.assertEqual(result.content, "PROVA L3")
+        self.assertIsNotNone(result.hash_sha256)
+
 
 if __name__ == "__main__":
     unittest.main()

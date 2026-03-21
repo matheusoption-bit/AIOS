@@ -72,10 +72,34 @@ class ViolationCollector(ast.NodeVisitor):
         self.direct_os_funcs: set[str] = set()
         self.importlib_aliases: set[str] = set()
         self.direct_import_module_funcs: set[str] = set()
+        self.callable_alias_scopes: list[dict[str, str | None]] = [{}]
 
     @property
     def is_allowlisted(self) -> bool:
         return self.path in ALLOWED_DISALLOWED_CALL_PATHS
+
+    def _bind_callable_alias(self, name: str, aliased_callable: str | None) -> None:
+        self.callable_alias_scopes[-1][name] = aliased_callable
+
+    def _lookup_callable_alias(self, name: str) -> str | None:
+        for scope in reversed(self.callable_alias_scopes):
+            if name in scope:
+                return scope[name]
+        return None
+
+    def _push_callable_scope(self) -> None:
+        self.callable_alias_scopes.append({})
+
+    def _pop_callable_scope(self) -> None:
+        self.callable_alias_scopes.pop()
+
+    def _bind_function_arguments(self, args: ast.arguments) -> None:
+        for arg in (*args.posonlyargs, *args.args, *args.kwonlyargs):
+            self._bind_callable_alias(arg.arg, None)
+        if args.vararg is not None:
+            self._bind_callable_alias(args.vararg.arg, None)
+        if args.kwarg is not None:
+            self._bind_callable_alias(args.kwarg.arg, None)
 
     def visit_Import(self, node: ast.Import) -> None:
         for alias in node.names:
@@ -111,11 +135,102 @@ class ViolationCollector(ast.NodeVisitor):
                     self.direct_import_module_funcs.add(alias.asname or alias.name)
         self.generic_visit(node)
 
+    def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
+        self._bind_callable_alias(node.name, None)
+
+        for decorator in node.decorator_list:
+            self.visit(decorator)
+        self.visit(node.args)
+        if node.returns is not None:
+            self.visit(node.returns)
+
+        self._push_callable_scope()
+        self._bind_function_arguments(node.args)
+        try:
+            for statement in node.body:
+                self.visit(statement)
+        finally:
+            self._pop_callable_scope()
+
+    def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:
+        self._bind_callable_alias(node.name, None)
+
+        for decorator in node.decorator_list:
+            self.visit(decorator)
+        self.visit(node.args)
+        if node.returns is not None:
+            self.visit(node.returns)
+
+        self._push_callable_scope()
+        self._bind_function_arguments(node.args)
+        try:
+            for statement in node.body:
+                self.visit(statement)
+        finally:
+            self._pop_callable_scope()
+
+    def visit_ClassDef(self, node: ast.ClassDef) -> None:
+        self._bind_callable_alias(node.name, None)
+
+        for decorator in node.decorator_list:
+            self.visit(decorator)
+        for base in node.bases:
+            self.visit(base)
+        for keyword in node.keywords:
+            self.visit(keyword)
+
+        self._push_callable_scope()
+        try:
+            for statement in node.body:
+                self.visit(statement)
+        finally:
+            self._pop_callable_scope()
+
+    def visit_Assign(self, node: ast.Assign) -> None:
+        if len(node.targets) == 1 and isinstance(node.targets[0], ast.Name):
+            target_name = node.targets[0].id
+            value = node.value
+            aliased_callable = None
+
+            if isinstance(value, ast.Name):
+                if value.id in DISALLOWED_BUILTINS:
+                    aliased_callable = f"builtin '{value.id}'"
+                elif value.id in self.direct_subprocess_funcs:
+                    aliased_callable = f"subprocess function '{value.id}'"
+                elif value.id in self.direct_os_funcs:
+                    aliased_callable = f"os function '{value.id}'"
+                else:
+                    aliased_callable = self._lookup_callable_alias(value.id)
+            elif isinstance(value, ast.Attribute) and isinstance(value.value, ast.Name):
+                if value.value.id in self.os_aliases and value.attr in DISALLOWED_OS_FUNCS:
+                    aliased_callable = f"os.{value.attr}"
+                elif value.value.id in self.subprocess_aliases and value.attr in DISALLOWED_SUBPROCESS_FUNCS:
+                    aliased_callable = f"subprocess.{value.attr}"
+
+            self._bind_callable_alias(target_name, aliased_callable)
+
+        self.generic_visit(node)
+
     def visit_Call(self, node: ast.Call) -> None:
         func = node.func
 
         if isinstance(func, ast.Name) and func.id in DISALLOWED_BUILTINS and not self.is_allowlisted:
             self.violations.append((node.lineno, f"builtin '{func.id}' is not allowed"))
+
+        if isinstance(func, ast.Name) and not self.is_allowlisted:
+            aliased_callable = self._lookup_callable_alias(func.id)
+            if aliased_callable is not None:
+                self.violations.append(
+                    (
+                        node.lineno,
+                        f"aliased disallowed callable '{func.id}' -> {aliased_callable} is not allowed",
+                    )
+                )
+
+        if isinstance(func, ast.Name) and func.id in self.direct_subprocess_funcs and not self.is_allowlisted:
+            self.violations.append(
+                (node.lineno, f"subprocess function '{func.id}' is not allowed")
+            )
 
         if isinstance(func, ast.Attribute) and isinstance(func.value, ast.Name):
             if func.value.id in self.os_aliases and func.attr in DISALLOWED_OS_FUNCS and not self.is_allowlisted:
@@ -141,11 +256,6 @@ class ViolationCollector(ast.NodeVisitor):
                 self.violations.append(
                     (node.lineno, f"importlib.import_module('{node.args[0].value}') is not allowed")
                 )
-
-        if isinstance(func, ast.Name) and func.id in self.direct_subprocess_funcs and not self.is_allowlisted:
-            self.violations.append(
-                (node.lineno, f"subprocess function '{func.id}' is not allowed")
-            )
 
         if isinstance(func, ast.Name) and func.id in self.direct_os_funcs and not self.is_allowlisted:
             self.violations.append(
